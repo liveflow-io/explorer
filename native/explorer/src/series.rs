@@ -224,21 +224,25 @@ pub fn s_cut(
 
     if include_breaks {
         let mut cut_df = cut_series.struct_()?.clone().unnest();
+        cut_df.try_apply("category", |s| s.cast(&DataType::String))?;
 
-        let cut_df = cut_df.insert_column(0, series)?;
+        cut_df.insert_column(0, series.into())?;
 
-        cut_df.set_column_names([
+        cut_df.set_column_names(&[
             "values",
             break_point_label.unwrap_or("break_point"),
             category_label.unwrap_or("category"),
         ])?;
 
-        Ok(ExDataFrame::new(cut_df.clone()))
+        Ok(ExDataFrame::new(cut_df))
     } else {
-        let mut cut_df = DataFrame::new(vec![Column::from(series), Column::from(cut_series)])?;
-        cut_df.set_column_names(["values", category_label.unwrap_or("category")])?;
+        let height = series.len();
+        let cut_series = cut_series.cast(&DataType::String)?;
+        let mut cut_df =
+            DataFrame::new(height, vec![Column::from(series), Column::from(cut_series)])?;
+        cut_df.set_column_names(&["values", category_label.unwrap_or("category")])?;
 
-        Ok(ExDataFrame::new(cut_df.clone()))
+        Ok(ExDataFrame::new(cut_df))
     }
 }
 
@@ -267,20 +271,26 @@ pub fn s_qcut(
 
     if include_breaks {
         let mut qcut_df = qcut_series.struct_()?.clone().unnest();
-        let qcut_df = qcut_df.insert_column(0, series)?;
+        qcut_df.try_apply("category", |s| s.cast(&DataType::String))?;
+        qcut_df.insert_column(0, series.into())?;
 
-        qcut_df.set_column_names([
+        qcut_df.set_column_names(&[
             "values",
             break_point_label.unwrap_or("break_point"),
             category_label.unwrap_or("category"),
         ])?;
 
-        Ok(ExDataFrame::new(qcut_df.clone()))
+        Ok(ExDataFrame::new(qcut_df))
     } else {
-        let mut qcut_df = DataFrame::new(vec![Column::from(series), Column::from(qcut_series)])?;
-        qcut_df.set_column_names(["values", category_label.unwrap_or("category")])?;
+        let height = series.len();
+        let qcut_series = qcut_series.cast(&DataType::String)?;
+        let mut qcut_df = DataFrame::new(
+            height,
+            vec![Column::from(series), Column::from(qcut_series)],
+        )?;
+        qcut_df.set_column_names(&["values", category_label.unwrap_or("category")])?;
 
-        Ok(ExDataFrame::new(qcut_df.clone()))
+        Ok(ExDataFrame::new(qcut_df))
     }
 }
 
@@ -928,7 +938,7 @@ pub fn s_median(env: Env, s: ExSeries) -> Result<Term, ExplorerError> {
 
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_mode(s: ExSeries) -> Result<ExSeries, ExplorerError> {
-    match mode::mode(&s) {
+    match mode::mode(&s, false) {
         Ok(s) => Ok(ExSeries::new(s)),
         Err(e) => Err(e.into()),
     }
@@ -1030,6 +1040,9 @@ pub fn s_correlation(
 pub fn s_covariance(env: Env, s1: ExSeries, s2: ExSeries, ddof: u8) -> Result<Term, ExplorerError> {
     let s1 = s1.clone_inner().cast(&DataType::Float64)?;
     let s2 = s2.clone_inner().cast(&DataType::Float64)?;
+    if s1.len() == s2.len() && s1.len() <= ddof as usize {
+        return Ok(None::<f64>.encode(env));
+    }
     let cov = cov(s1.f64()?, s2.f64()?, ddof);
     Ok(term_from_optional_float(cov, env))
 }
@@ -1283,6 +1296,7 @@ pub fn s_sample_n(
     shuffle: bool,
     seed: Option<u64>,
 ) -> Result<ExSeries, ExplorerError> {
+    let shuffle = shuffle || (!replace && n < series.len());
     let new_s = series.sample_n(n, replace, shuffle, seed)?;
 
     Ok(ExSeries::new(new_s))
@@ -1296,6 +1310,8 @@ pub fn s_sample_frac(
     shuffle: bool,
     seed: Option<u64>,
 ) -> Result<ExSeries, ExplorerError> {
+    let n = (series.len() as f64 * frac) as usize;
+    let shuffle = shuffle || (!replace && n < series.len());
     let new_s = series.sample_frac(frac, replace, shuffle, seed)?;
 
     Ok(ExSeries::new(new_s))
@@ -1380,7 +1396,17 @@ pub fn s_select(
             true => Ok(on_true),
             false => Ok(on_false),
         },
-        _ => {
+        len => {
+            let on_true = if on_true.len() == 1 {
+                on_true.new_from_index(0, len)
+            } else {
+                on_true.clone_inner()
+            };
+            let on_false = if on_false.len() == 1 {
+                on_false.new_from_index(0, len)
+            } else {
+                on_false.clone_inner()
+            };
             let selected = on_true.zip_with(pred.bool().unwrap(), &on_false)?;
             Ok(ExSeries::new(selected))
         }
@@ -1389,11 +1415,7 @@ pub fn s_select(
 
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_not(s1: ExSeries) -> Result<ExSeries, ExplorerError> {
-    let s2 = s1
-        .bool()?
-        .into_iter()
-        .map(|opt_v| opt_v.map(|v| !v))
-        .collect();
+    let s2 = s1.bool()?.iter().map(|opt_v| opt_v.map(|v| !v)).collect();
 
     Ok(ExSeries::new(s2))
 }

@@ -3978,6 +3978,15 @@ defmodule Explorer.SeriesTest do
       assert Series.select(predicate, on_true, on_false) |> Series.to_list() == [1, 0, 3, 0]
     end
 
+    test "select broadcasts a single string operand" do
+      predicate = Series.from_list([true, false, true, false])
+      on_true = Series.from_list(["unspecified"])
+      on_false = Series.from_list(["a", "b", "c", "d"])
+
+      assert Series.select(predicate, on_true, on_false) |> Series.to_list() ==
+               ["unspecified", "b", "unspecified", "d"]
+    end
+
     test "select allows if on_true or on_false is not same size as predicate, but both of them are of size 1" do
       predicate = Series.from_list([true, false, true, false])
       on_true = Series.from_list([1])
@@ -6779,11 +6788,7 @@ defmodule Explorer.SeriesTest do
       s = Series.from_list(["1", "\"a\""])
 
       assert_raise RuntimeError,
-                   ~s"""
-                   Polars Error: error deserializing JSON: error deserializing value "String("a")" as numeric. \\
-                               Try increasing `infer_schema_length` or specifying a schema.
-                               \
-                   """,
+                   "Polars Error: error deserializing JSON: error deserializing value \"String(\"a\")\" as numeric.\n\nTry increasing `infer_schema_length` or specifying a schema.",
                    fn -> Series.json_decode(s, {:s, 64}) end
     end
 

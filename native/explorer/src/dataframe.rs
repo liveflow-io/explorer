@@ -1,9 +1,9 @@
+use polars::frame::PivotColumnNaming;
 use polars::prelude::*;
-use polars_lazy::frame::pivot::PivotExpr;
-use polars_ops::pivot::{pivot_stable, PivotAgg};
 
 use polars_arrow::ffi;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::datatypes::ExSeriesDtype;
 use crate::ex_expr_to_exprs;
@@ -101,7 +101,7 @@ pub fn df_concat_columns(dfs: Vec<ExDataFrame>) -> Result<ExDataFrame, ExplorerE
         .flat_map(|(idx, ex_df)| {
             let df = ex_df.clone_inner();
 
-            df.get_columns()
+            df.columns()
                 .iter()
                 .map(|col| {
                     let name = col.name();
@@ -120,7 +120,7 @@ pub fn df_concat_columns(dfs: Vec<ExDataFrame>) -> Result<ExDataFrame, ExplorerE
         })
         .collect::<Vec<Column>>();
 
-    let out_df = DataFrame::new(cols)?;
+    let out_df = DataFrame::new_infer_height(cols)?;
 
     Ok(ExDataFrame::new(out_df))
 }
@@ -212,10 +212,13 @@ pub fn df_sample_n(
 ) -> Result<ExDataFrame, ExplorerError> {
     let n_s = Series::new("n".into(), &[n]);
     let new_df = if groups.is_empty() {
+        let shuffle = shuffle || (!replace && n < df.height() as u64);
         df.sample_n(&n_s, replace, shuffle, seed)?
     } else {
-        df.group_by_opt_order(groups, stable_groups)?
-            .apply(|df| df.sample_n(&n_s, replace, shuffle, seed))?
+        df.group_by_opt_order(groups, stable_groups)?.apply(|df| {
+            let shuffle = shuffle || (!replace && n < df.height() as u64);
+            df.sample_n(&n_s, replace, shuffle, seed)
+        })?
     };
 
     Ok(ExDataFrame::new(new_df))
@@ -233,10 +236,15 @@ pub fn df_sample_frac(
 ) -> Result<ExDataFrame, ExplorerError> {
     let frac_s = Series::new("frac".into(), &[frac]);
     let new_df = if groups.is_empty() {
+        let n = (df.height() as f64 * frac) as usize;
+        let shuffle = shuffle || (!replace && n < df.height());
         df.sample_frac(&frac_s, replace, shuffle, seed)?
     } else {
-        df.group_by_opt_order(groups, stable_groups)?
-            .apply(|df| df.sample_frac(&frac_s, replace, shuffle, seed))?
+        df.group_by_opt_order(groups, stable_groups)?.apply(|df| {
+            let n = (df.height() as f64 * frac) as usize;
+            let shuffle = shuffle || (!replace && n < df.height());
+            df.sample_frac(&frac_s, replace, shuffle, seed)
+        })?
     };
 
     Ok(ExDataFrame::new(new_df))
@@ -385,7 +393,7 @@ pub fn df_to_dummies(df: ExDataFrame, selection: Vec<&str>) -> Result<ExDataFram
 pub fn df_put_column(df: ExDataFrame, series: ExSeries) -> Result<ExDataFrame, ExplorerError> {
     let mut df = df.clone();
     let s = series.clone_inner();
-    let new_df = df.with_column(s)?.clone();
+    let new_df = df.with_column(s.into())?.clone();
 
     Ok(ExDataFrame::new(new_df))
 }
@@ -403,7 +411,7 @@ pub fn df_from_series(columns: Vec<ExSeries>) -> Result<ExDataFrame, ExplorerErr
         .map(|c| Column::from(c.clone_inner()))
         .collect();
 
-    let df = DataFrame::new(columns)?;
+    let df = DataFrame::new_infer_height(columns)?;
 
     Ok(ExDataFrame::new(df))
 }
@@ -421,11 +429,11 @@ pub fn df_group_indices(
     groups: Vec<&str>,
 ) -> Result<Vec<ExSeries>, ExplorerError> {
     let series = df
-        .group_by_with_series(df.select_columns(groups)?, true, true)?
+        .group_by_with_series(df.select(groups)?.columns().to_vec(), true, true)?
         .groups()?
         .column("groups")?
         .list()?
-        .into_iter()
+        .series_iter()
         .map(|series| ExSeries::new(series.unwrap()))
         .collect();
     Ok(series)
@@ -454,15 +462,23 @@ pub fn df_pivot_wider(
         df.rename(id_name, new_name.into())?;
     }
 
-    let mut new_df = pivot_stable(
-        &df,
-        [pivot_column],
-        Some(temp_id_names),
-        Some(values_column),
-        false,
-        Some(PivotAgg(Arc::new(PivotExpr::from_expr(col("").first())))),
-        None,
-    )?;
+    let on_columns =
+        df.select([pivot_column])?
+            .unique_stable(None, UniqueKeepStrategy::First, None)?;
+
+    let mut new_df = df
+        .lazy()
+        .pivot(
+            cols([pivot_column]),
+            Arc::new(on_columns),
+            cols(temp_id_names),
+            cols(values_column),
+            element().first(),
+            true,
+            "_".into(),
+            PivotColumnNaming::Auto,
+        )
+        .collect()?;
 
     // Instead of using the names from the pivoted DF, we go back
     // and restore the original ID column names, so we can use our
