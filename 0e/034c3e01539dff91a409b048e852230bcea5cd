@@ -1,0 +1,70 @@
+native/explorer/src/series.rs
+  s_e571ac1c413b14::t_f36fef45cd69bb 227,240,274,286
+  s_e571ac1c413b14::t_6a85715f12d023 287-290,1408
+  s_e571ac1c413b14::t_9f7b38d3920caa 1299,1313-1314
+  s_e571ac1c413b14::t_55037af16d2c11 1043-1045
+  s_e571ac1c413b14::t_bad03c3bd7d0a8 229,231,237,239,241-243,245,275,277,283,285,291-293,941
+native/explorer/src/dataframe/io.rs
+  s_e571ac1c413b14::t_4c5c11f0c1d444 59-62,89-90,93,99-103,106,110,113-115,117
+  s_e571ac1c413b14::t_a72947a7f2d006 120-121,123-124,133-138,141-146
+  s_e571ac1c413b14::t_3f74b1e80aba0c 30-31,104,122
+  s_e571ac1c413b14::t_dde884cf0f38e8 91
+  s_e571ac1c413b14::t_e41d0db0244ced 125-132
+  s_e571ac1c413b14::t_8ba6e34520aefd 139-140
+  s_e571ac1c413b14::t_563a9bebcc5bd6 237,239-240,266-268,270
+native/explorer/src/encoding.rs
+  s_e571ac1c413b14::t_6a85715f12d023 644
+  s_e571ac1c413b14::t_ffd86668304b4d 780
+  s_e571ac1c413b14::t_2a75c796cb59ea 572,615,805
+native/explorer/src/lazyframe.rs
+  s_e571ac1c413b14::t_7c5305f5f1cde8 6-7,160-166
+  s_e571ac1c413b14::t_6a85715f12d023 174-180
+  s_e571ac1c413b14::t_16fe5b89672da8 228-229
+  s_e571ac1c413b14::t_28121164ac7a21 5,8-9
+  s_e571ac1c413b14::t_55333d1d06bdbf 327-328,489
+native/explorer/rust-toolchain.toml
+  s_e571ac1c413b14::t_9183469a98293d 4
+native/explorer/src/dataframe.rs
+  s_e571ac1c413b14::t_6a85715f12d023 465-467
+  s_e571ac1c413b14::t_26d726ec41ad0d 476
+  s_e571ac1c413b14::t_b4055f8a032291 6,104,123,396,414,432,468-475,477-481
+  s_e571ac1c413b14::t_4f36c310619325 215,218-221,239-240,243-247
+  s_e571ac1c413b14::t_b02038c7b62ad6 1,436
+native/explorer/src/series/from_list.rs
+  s_e571ac1c413b14::t_610efabf971b4a 464
+native/explorer/src/expressions.rs
+  s_e571ac1c413b14::t_1950cfa16449c9 1211
+  s_e571ac1c413b14::t_4f5f1777de5e6d 545-549
+  s_e571ac1c413b14::t_60eb3c38bb31f6 181,239,484
+native/explorer/src/lazyframe/io.rs
+  s_e571ac1c413b14::t_35516c287c543d 1,6,29,54,57,95,97,104-110,144,146,148,154-160,179,207-208,214-220,254-255,257,262-268,297,338,341-342,345,350-356,385
+native/explorer/Cargo.toml
+  h_a788fab786425d 10,18,21,55,57,63,77,89,94,97,100-101
+  s_e571ac1c413b14::t_4bda17fdbaeeb9 28
+  s_e571ac1c413b14::t_8742fe4b28007b 30-34
+  s_e571ac1c413b14::t_d921d6f46b696c 26-27,37,88
+native/explorer/src/datatypes.rs
+  s_e571ac1c413b14::t_5d88c64da64b71 6
+  s_e571ac1c413b14::t_10a8eb341f174d 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0e034c3e01539dff91a409b048e852230bcea5cd",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  },
+  "sessions": {
+    "s_e571ac1c413b14": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "190e583a-152c-4288-be85-5c5ddd92ac45",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
