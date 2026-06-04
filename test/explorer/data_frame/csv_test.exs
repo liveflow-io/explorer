@@ -366,6 +366,30 @@ defmodule Explorer.DataFrame.CSVTest do
     end
 
     @tag :tmp_dir
+    test "dtypes - mismatched names", config do
+      csv =
+        tmp_csv(config.tmp_dir, """
+        first_name , last_name , dob
+        Alice , Ant , 01/02/1970
+        Billy , Bat , 03/04/1990
+        """)
+
+      types = [
+        {"first_name", :string},
+        {"last_name", :string},
+        {"dob", :string}
+      ]
+
+      assert csv
+             |> DF.from_csv!(dtypes: types)
+             |> DF.to_columns(atom_keys: true) == %{
+               dob: [" 01/02/1970", " 03/04/1990"],
+               first_name: ["Alice ", "Billy "],
+               last_name: [" Ant ", " Bat "]
+             }
+    end
+
+    @tag :tmp_dir
     test "dtypes - all as strings", config do
       csv =
         tmp_csv(config.tmp_dir, """

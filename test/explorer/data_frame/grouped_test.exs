@@ -596,6 +596,27 @@ defmodule Explorer.DataFrame.GroupedTest do
       assert df2.groups.columns == ["c"]
     end
 
+    test "selects with aggregate predicates and row values when there is a group" do
+      df = DF.new(g: ["a", "a", "b"], v: [0, 0, 1])
+      df1 = DF.group_by(df, :g)
+
+      df2 =
+        DF.mutate_with(df1, fn ldf ->
+          group_sum_is_zero? = Series.equal(Series.sum(ldf["v"]), 0)
+          nil_value = Series.from_list([nil], dtype: {:s, 64})
+
+          [out: Series.select(group_sum_is_zero?, nil_value, ldf["v"])]
+        end)
+
+      assert DF.to_columns(df2, atom_keys: true) == %{
+               g: ["a", "a", "b"],
+               v: [0, 0, 1],
+               out: [nil, nil, 1]
+             }
+
+      assert df2.groups.columns == ["g"]
+    end
+
     test "adds new columns with window functions" do
       df = DF.new(a: Enum.to_list(1..10), z: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2])
       df1 = DF.group_by(df, :z)
@@ -1210,6 +1231,45 @@ defmodule Explorer.DataFrame.GroupedTest do
   end
 
   describe "join/4" do
+    test "lazy aggregate joined on different key names keeps the left key" do
+      activity =
+        DF.new(%{
+          "source_id" => ["i1", "i1", "i2"],
+          "currency" => ["USD", "USD", "USD"],
+          "amount" => [100, -20, 0]
+        })
+        |> DF.lazy()
+
+      documents =
+        DF.new(%{
+          "id" => ["i1", "i2"],
+          "number" => ["INV-1", "INV-2"],
+          "memo" => ["memo", "memo2"]
+        })
+        |> DF.lazy()
+
+      result =
+        activity
+        |> DF.group_by(["source_id", "currency"])
+        |> DF.summarise_with(fn ldf -> [outstanding: Series.sum(ldf["amount"])] end)
+        |> DF.filter_with(fn ldf -> Series.not_equal(ldf["outstanding"], 0) end)
+        |> DF.mutate_with(fn _ldf -> [source_type: "invoice"] end)
+        |> DF.join(documents, how: :inner, on: [{"source_id", "id"}])
+        |> DF.sort_with(fn ldf -> [asc: ldf["source_id"]] end)
+        |> DF.mutate_with(fn ldf -> [row_id: Series.format(["rows::", ldf["source_id"]])] end)
+        |> DF.select(["row_id", "source_id", "source_type", "number", "memo", "outstanding"])
+        |> DF.collect()
+
+      assert DF.to_columns(result, atom_keys: true) == %{
+               row_id: ["rows::i1"],
+               source_id: ["i1"],
+               source_type: ["invoice"],
+               number: ["INV-1"],
+               memo: ["memo"],
+               outstanding: [80]
+             }
+    end
+
     test "inner join keep groups from left" do
       left = DF.new(a: [1, 2, 3], b: ["a", "b", "c"])
       right = DF.new(a: [1, 2, 2], c: ["d", "e", "f"])

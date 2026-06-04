@@ -3,6 +3,7 @@ mod ex_dtypes;
 use crate::atoms;
 use crate::ExplorerError;
 use chrono::prelude::*;
+use chrono::TimeZone;
 
 #[cfg(feature = "cloud")]
 use polars::prelude::cloud::CloudOptions;
@@ -18,6 +19,7 @@ use std::str::FromStr;
 use polars::prelude::cloud::AmazonS3ConfigKey as S3Key;
 
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
+use polars_parquet::parquet::compression::{BrotliLevel, GzipLevel, ZstdLevel};
 
 pub use polars_arrow::datatypes::TimeUnit as ArrowTimeUnit;
 

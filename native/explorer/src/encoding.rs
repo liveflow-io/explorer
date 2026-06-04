@@ -569,7 +569,7 @@ fn time_series_to_list<'b>(s: &Series, env: Env<'b>) -> Result<Term<'b>, Explore
 fn generic_string_series_to_list<'b>(s: &Series, env: Env<'b>) -> Result<Term<'b>, ExplorerError> {
     Ok(unsafe_iterator_series_to_list!(
         env,
-        s.str()?.into_iter().map(|option| option.encode(env))
+        s.str()?.iter().map(|option| option.encode(env))
     ))
 }
 
@@ -612,7 +612,7 @@ macro_rules! float_series_to_list {
 
             Ok(unsafe_iterator_series_to_list!(
                 env,
-                s.$convert_function()?.into_iter().map(|option| {
+                s.$convert_function()?.iter().map(|option| {
                     match option {
                         Some(x) => {
                             if x.is_finite() {
@@ -641,7 +641,7 @@ macro_rules! series_to_list {
         Ok(unsafe_iterator_series_to_list!(
             $env,
             $s.$convert_function()?
-                .into_iter()
+                .iter()
                 .map(|option| option.encode($env))
         ))
     };
@@ -777,7 +777,7 @@ pub fn list_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
 
         DataType::List(_inner_dtype) => s
             .list()?
-            .into_iter()
+            .series_iter()
             .map(|item| match item {
                 Some(list) => list_from_series(ExSeries::new(list), env),
                 None => Ok(None::<bool>.encode(env)),
@@ -802,7 +802,7 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         DataType::Boolean => {
             let mut bin = OwnedBinary::new(s.len()).unwrap();
             let slice = bin.as_mut_slice();
-            for (i, v) in s.bool()?.into_iter().enumerate() {
+            for (i, v) in s.bool()?.iter().enumerate() {
                 slice[i] = v.unwrap() as u8;
             }
             Ok([bin.release(env)].encode(env))

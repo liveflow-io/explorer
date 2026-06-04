@@ -4930,7 +4930,7 @@ defmodule Explorer.Series do
         Polars[3 x 3]
         values f64 [1.0, 2.0, 3.0]
         break_point f64 [1.5, 2.5, Inf]
-        category category ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
+        category string ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
       >
 
       iex> s = Explorer.Series.from_list([1.0, 2.0, 3.0])
@@ -4938,7 +4938,7 @@ defmodule Explorer.Series do
       #Explorer.DataFrame<
         Polars[3 x 2]
         values f64 [1.0, 2.0, 3.0]
-        category category ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
+        category string ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
       >
   """
   @doc type: :aggregation
@@ -4998,7 +4998,7 @@ defmodule Explorer.Series do
       #Explorer.DataFrame<
         Polars[5 x 2]
         values f64 [1.0, 2.0, 3.0, 4.0, 5.0]
-        category category ["(-inf, 2]", "(-inf, 2]", "(2, 4]", "(2, 4]", "(4, inf]"]
+        category string ["(-inf, 2]", "(-inf, 2]", "(2, 4]", "(2, 4]", "(4, inf]"]
       >
   """
   @doc type: :aggregation
