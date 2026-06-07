@@ -182,6 +182,7 @@ defmodule Explorer.PolarsBackend.Shared do
       :boolean -> Native.s_from_list_bool(name, list)
       :string -> Native.s_from_list_str(name, list)
       :category -> Native.s_from_list_categories(name, list)
+      {:enum, categories} -> apply(:s_from_list_enum, [name, list, categories])
       :date -> apply(:s_from_list_date, [name, list])
       :time -> apply(:s_from_list_time, [name, list])
       {:naive_datetime, precision} -> apply(:s_from_list_naive_datetime, [name, list, precision])
