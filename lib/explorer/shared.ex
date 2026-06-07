@@ -43,7 +43,12 @@ defmodule Explorer.Shared do
   """
   def dtypes do
     @scalar_types ++
-      [{:list, :any}, {:struct, :any}, {:decimal, :pos_integer, :pos_integer}]
+      [
+        {:enum, :any},
+        {:list, :any},
+        {:struct, :any},
+        {:decimal, :pos_integer, :pos_integer}
+      ]
   end
 
   @doc """
@@ -77,6 +82,12 @@ defmodule Explorer.Shared do
 
   def normalise_dtype({:datetime, p, tz} = dtype) when p in @precisions and is_binary(tz),
     do: dtype
+
+  def normalise_dtype({:enum, categories}) when is_list(categories) do
+    if Enum.all?(categories, &is_binary/1) and Enum.uniq(categories) == categories do
+      {:enum, categories}
+    end
+  end
 
   def normalise_dtype(dtype) when dtype in @scalar_types, do: dtype
   def normalise_dtype(dtype) when dtype in [:float, :f64], do: {:f, 64}
@@ -538,6 +549,7 @@ defmodule Explorer.Shared do
   def dtype_to_string({:naive_datetime, p}), do: "naive_datetime[#{precision_string(p)}]"
   def dtype_to_string({:datetime, p, tz}), do: "datetime[#{precision_string(p)}, #{tz}]"
   def dtype_to_string({:duration, p}), do: "duration[#{precision_string(p)}]"
+  def dtype_to_string({:enum, _categories}), do: "enum"
   def dtype_to_string({:list, dtype}), do: "list[" <> dtype_to_string(dtype) <> "]"
   def dtype_to_string({:struct, fields}), do: "struct[#{length(fields)}]"
   def dtype_to_string({:f, size}), do: "f" <> Integer.to_string(size)

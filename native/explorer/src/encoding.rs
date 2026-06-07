@@ -709,7 +709,9 @@ pub fn resource_term_from_value<'b>(
             encode_datetime(v, time_unit, time_zone.parse::<Tz>().unwrap(), env)
         }
         AnyValue::Duration(v, time_unit) => encode_duration(v, time_unit, env),
-        AnyValue::Categorical(idx, mapping) => Ok(mapping.cat_to_str(idx).encode(env)),
+        AnyValue::Categorical(idx, mapping) | AnyValue::Enum(idx, mapping) => {
+            Ok(mapping.cat_to_str(idx).encode(env))
+        }
         AnyValue::List(series) => list_from_series(ExSeries::new(series), env),
         AnyValue::Struct(_, _, fields) => v
             ._iter_struct_av()
@@ -773,7 +775,7 @@ pub fn list_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
 
         DataType::Binary => generic_binary_series_to_list(&s.resource, &s, env),
         DataType::String => generic_string_series_to_list(&s, env),
-        DataType::Categorical(_, _) => categorical_series_to_list(&s, env),
+        DataType::Categorical(_, _) | DataType::Enum(_, _) => categorical_series_to_list(&s, env),
 
         DataType::List(_inner_dtype) => s
             .list()?
@@ -827,6 +829,29 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         }
         DataType::Categorical(_, _) => {
             series_to_iovec!(resource, s.cast(&DataType::UInt32)?.u32()?, env, u32)
+        }
+        DataType::Enum(categories, _) => {
+            let enum_categories = categories
+                .categories()
+                .values_iter()
+                .enumerate()
+                .map(|(idx, category)| (category, idx as u32))
+                .collect::<HashMap<_, _>>();
+            let strings = s.cast(&DataType::String)?;
+            let values: Vec<Option<u32>> = strings
+                .str()?
+                .iter()
+                .map(|category| {
+                    category.and_then(|category| enum_categories.get(category).copied())
+                })
+                .collect();
+            let mut bin = OwnedBinary::new(values.len() * mem::size_of::<u32>()).unwrap();
+            for (idx, value) in values.into_iter().enumerate() {
+                let offset = idx * mem::size_of::<u32>();
+                bin.as_mut_slice()[offset..offset + mem::size_of::<u32>()]
+                    .copy_from_slice(&value.unwrap_or_default().to_ne_bytes());
+            }
+            Ok([bin.release(env)].encode(env))
         }
         dt => panic!("to_iovec/1 not implemented for {dt:?}"),
     }

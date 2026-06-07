@@ -107,6 +107,26 @@ defmodule Explorer.SeriesTest do
       assert Series.dtype(s) == :string
     end
 
+    test "with enum dtype" do
+      categories = ["low", "medium", "high"]
+      s = Series.from_list(["low", "high", "low"], dtype: {:enum, categories})
+
+      assert Series.to_list(s) == ["low", "high", "low"]
+      assert Series.dtype(s) == {:enum, categories}
+      assert Series.categories(s) |> Series.to_list() == categories
+      assert Series.iotype(s) == {:u, 32}
+
+      assert Series.to_iovec(s) == [
+               <<0::unsigned-32-native, 2::unsigned-32-native, 0::unsigned-32-native>>
+             ]
+    end
+
+    test "with enum dtype raises on invalid values" do
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.from_list(["low", "unknown"], dtype: {:enum, ["low", "medium", "high"]})
+      end
+    end
+
     test "with time" do
       time = ~T[02:05:03.654321]
       s = Series.from_list([time])
@@ -4449,6 +4469,21 @@ defmodule Explorer.SeriesTest do
       assert Series.dtype(s1) == :category
     end
 
+    test "string series to enum" do
+      dtype = {:enum, ["apple", "banana", "lemon"]}
+      s = Series.from_list(["apple", "banana", "apple", "lemon"])
+      s1 = Series.cast(s, dtype)
+
+      assert Series.to_list(s1) == ["apple", "banana", "apple", "lemon"]
+      assert Series.dtype(s1) == dtype
+    end
+
+    test "string series to enum raises on invalid values" do
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.from_list(["apple", "orange"]) |> Series.cast({:enum, ["apple", "banana"]})
+      end
+    end
+
     test "string series to naive datetime" do
       s = Series.from_list(["2023-08-29T17:39:43"])
       ms = Series.cast(s, {:naive_datetime, :millisecond})
@@ -6178,6 +6213,8 @@ defmodule Explorer.SeriesTest do
     test "cut/3 with no nils" do
       series = -30..30//5 |> Enum.map(&(&1 / 10)) |> Enum.to_list() |> Series.from_list()
       df = Series.cut(series, [-1, 1])
+      assert Series.dtype(df[:category]) == {:enum, ["(-inf, -1]", "(-1, 1]", "(1, inf]"]}
+
       freqs = Series.frequencies(df[:category])
       assert Series.to_list(freqs[:values]) == ["(-inf, -1]", "(-1, 1]", "(1, inf]"]
       assert Series.to_list(freqs[:counts]) == [5, 4, 4]
@@ -6205,6 +6242,7 @@ defmodule Explorer.SeriesTest do
         )
 
       assert Explorer.DataFrame.names(df) == ["values", "bp", "cat"]
+      assert Series.dtype(df[:cat]) == {:enum, ["x", "y"]}
     end
 
     test "cut/3 with include breaks" do
@@ -6221,6 +6259,8 @@ defmodule Explorer.SeriesTest do
     test "qcut/3" do
       series = Enum.to_list(-5..3) |> Series.from_list()
       df = Series.qcut(series, [0.0, 0.25, 0.75])
+      assert Series.dtype(df[:category]) == :category
+
       freqs = Series.frequencies(df[:category])
 
       assert Series.to_list(freqs[:values]) == [
