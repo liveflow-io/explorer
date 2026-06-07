@@ -1,0 +1,57 @@
+lib/explorer/shared.ex
+  s_e571ac1c413b14::t_416e0ec9b94a46 46-51,86-91,552
+native/explorer/src/encoding.rs
+  s_e571ac1c413b14::t_db656a1f63a991 712-714,778
+  s_e571ac1c413b14::t_e3649037317430 841
+  s_e571ac1c413b14::t_9246c2c3e7bdd0 840,842
+  s_e571ac1c413b14::t_5155268568336f 843,847
+  s_e571ac1c413b14::t_b1b65dd08dce9e 848-854
+  s_e571ac1c413b14::t_9011b554efc75b 833-839,845
+lib/explorer/series.ex
+  s_e571ac1c413b14::t_d30b07faf602c7 5023
+  s_e571ac1c413b14::t_df045e49659ff9 1349-1350
+  s_e571ac1c413b14::t_abe2bc3ba9e8ca 947,1346
+  s_e571ac1c413b14::t_4c0ddd76e0251e 19-20,177,187
+  s_e571ac1c413b14::t_1afeab8eacf803 239-243,1314
+  s_e571ac1c413b14::t_ee1a3d994be8f9 485-492
+  s_e571ac1c413b14::t_d5b6dceaeb87c7 1345,1347-1348
+  s_e571ac1c413b14::t_0ce9938c99ba63 4955,4963
+native/explorer/src/series.rs
+  s_e571ac1c413b14::t_3e3f2292d63b3d 1258
+  s_e571ac1c413b14::t_5b146d2bca4c4a 408-410,1256-1257,1260
+native/explorer/src/datatypes/ex_dtypes.rs
+  s_e571ac1c413b14::t_2ae052d36e6c22 6,46,71-77,140-142
+native/explorer/src/series/from_list.rs
+  s_e571ac1c413b14::t_61f18de8644d96 424-425,430-434,437-441
+  ai_agent 426-429,435-436
+lib/explorer/polars_backend/shared.ex
+  s_e571ac1c413b14::t_bcd3692c1990cd 185
+test/explorer/series_test.exs
+  s_e571ac1c413b14::t_fcb9991764522b 6241
+  s_e571ac1c413b14::t_c2ba67c2ef055b 110-117,122-123
+  s_e571ac1c413b14::t_60bf3809e06f60 6195-6196,6224,6242
+  s_e571ac1c413b14::t_b0c889826d3d3f 4457-4465
+  s_e571ac1c413b14::t_df045e49659ff9 118-121
+lib/explorer/polars_backend/native.ex
+  s_e571ac1c413b14::t_332fcdb23019f9 402
+lib/explorer/polars_backend/series.ex
+  s_e571ac1c413b14::t_df045e49659ff9 70
+  s_e571ac1c413b14::t_f391cbe200bad0 68
+  s_e571ac1c413b14::t_dbbac9eccb4f53 17-19,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "4e74715282e79d8878675da71ccec86b48a3cba0",
+  "prompts": {},
+  "sessions": {
+    "s_e571ac1c413b14": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "190e583a-152c-4288-be85-5c5ddd92ac45",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
