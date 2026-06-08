@@ -1,0 +1,19 @@
+README.md
+  s_e571ac1c413b14::t_42837485ae2f90 267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "ca60b11426ee8965cce81979fce731ea5236bb42",
+  "prompts": {},
+  "sessions": {
+    "s_e571ac1c413b14": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "190e583a-152c-4288-be85-5c5ddd92ac45",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
