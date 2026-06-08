@@ -1,0 +1,14 @@
+mix.exs
+  h_a788fab786425d 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "70a7e5a77a885553459f4bb188d1b1c83c919edb",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
