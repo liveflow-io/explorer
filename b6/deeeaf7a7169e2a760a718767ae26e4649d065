@@ -1,0 +1,25 @@
+mix.exs
+  h_a788fab786425d 4
+  s_12bb1ea63c1220::t_a02957f2092a06 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "b6deeeaf7a7169e2a760a718767ae26e4649d065",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  },
+  "sessions": {
+    "s_12bb1ea63c1220": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4a81a2de-c960-4661-9d0e-4a6065d2ed76",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
