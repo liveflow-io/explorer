@@ -1,0 +1,71 @@
+test/explorer/series_test.exs
+  s_e571ac1c413b14::t_c2ba67c2ef055b 110-117,122-123
+  s_e571ac1c413b14::t_df045e49659ff9 118-121
+  s_9b1d3bcb0c967a::t_310dcaa28247d6 4001-4009
+  s_e571ac1c413b14::t_b0c889826d3d3f 4472-4486
+  s_e571ac1c413b14::t_60bf3809e06f60 6216-6217,6245,6263
+  s_e571ac1c413b14::t_fcb9991764522b 6262
+  s_e571ac1c413b14::t_a8f01ebd66a5e9 6831
+native/explorer/src/series/from_list.rs
+  s_e571ac1c413b14::t_61f18de8644d96 435-438
+  s_e571ac1c413b14::t_610efabf971b4a 480
+lib/explorer/polars_backend/series.ex
+  s_e571ac1c413b14::t_dbbac9eccb4f53 17-19,69
+  s_e571ac1c413b14::t_f391cbe200bad0 68
+  s_e571ac1c413b14::t_df045e49659ff9 70
+lib/explorer/series.ex
+  s_e571ac1c413b14::t_4c0ddd76e0251e 19-20,177,187
+  s_e571ac1c413b14::t_1afeab8eacf803 239-243,1314
+  s_e571ac1c413b14::t_ee1a3d994be8f9 485-492
+  s_e571ac1c413b14::t_abe2bc3ba9e8ca 947,1346
+  s_e571ac1c413b14::t_d5b6dceaeb87c7 1345,1347-1348
+  s_e571ac1c413b14::t_df045e49659ff9 1349-1350
+  s_e571ac1c413b14::t_0ce9938c99ba63 4955,4963
+  s_e571ac1c413b14::t_d30b07faf602c7 5023
+native/explorer/src/series.rs
+  s_e571ac1c413b14::t_bad03c3bd7d0a8 243,245,251,253-256,258,287,289,295,297,302-304,954
+  s_e571ac1c413b14::t_6a85715f12d023 298-301,1435
+  s_e571ac1c413b14::t_5b146d2bca4c4a 423-425,1239,1271-1272,1275
+  s_e571ac1c413b14::t_55037af16d2c11 1056-1058
+  s_e571ac1c413b14::t_3e3f2292d63b3d 1273
+  s_e571ac1c413b14::t_9f7b38d3920caa 1316,1330-1331
+  s_9b1d3bcb0c967a::t_24cd1406bece74 1416-1426
+lib/explorer/shared.ex
+  s_e571ac1c413b14::t_416e0ec9b94a46 46-51,86-91,552
+native/explorer/src/encoding.rs
+  s_e571ac1c413b14::t_2a75c796cb59ea 572,615,807
+  s_e571ac1c413b14::t_6a85715f12d023 644
+  s_e571ac1c413b14::t_db656a1f63a991 712-714,778
+  s_e571ac1c413b14::t_ffd86668304b4d 782
+  s_e571ac1c413b14::t_9011b554efc75b 833-839,845
+  s_e571ac1c413b14::t_9246c2c3e7bdd0 840,842
+  s_e571ac1c413b14::t_e3649037317430 841
+  s_e571ac1c413b14::t_5155268568336f 843,847
+  s_e571ac1c413b14::t_b1b65dd08dce9e 848-854
+native/explorer/src/datatypes/ex_dtypes.rs
+  s_e571ac1c413b14::t_2ae052d36e6c22 6,46,71-77,140-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1b4964f6bd13d840bd08769e5a66e987abde65f2",
+  "prompts": {},
+  "sessions": {
+    "s_9b1d3bcb0c967a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "65f4ce7f-2b7f-4dfa-8a05-5378b959b9a7",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    },
+    "s_e571ac1c413b14": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "190e583a-152c-4288-be85-5c5ddd92ac45",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
