@@ -1,0 +1,23 @@
+lib/explorer/polars_backend/data_frame.ex
+  s_f40309dcf9a734::t_c40943778de2ad 25
+test/explorer/data_frame_test.exs
+  s_f40309dcf9a734::t_3aeda4e6f6d1a5 41-50
+mix.lock
+  s_f40309dcf9a734::t_5e631be60d9b73 2,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.11",
+  "base_commit_sha": "c7119de22c7d82d983f2d6a9872b121c15a165cc",
+  "prompts": {},
+  "sessions": {
+    "s_f40309dcf9a734": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "90b664ab-e8d9-44bd-89cd-cd9b47c25a34",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
