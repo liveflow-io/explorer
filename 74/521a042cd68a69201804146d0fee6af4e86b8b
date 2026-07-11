@@ -1,0 +1,19 @@
+mix.exs
+  s_12bb1ea63c1220::t_3db985b81a3828 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.11",
+  "base_commit_sha": "74521a042cd68a69201804146d0fee6af4e86b8b",
+  "prompts": {},
+  "sessions": {
+    "s_12bb1ea63c1220": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4a81a2de-c960-4661-9d0e-4a6065d2ed76",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
