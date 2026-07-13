@@ -380,13 +380,20 @@ defmodule Explorer.DataFrame.CSVTest do
         {"dob", :string}
       ]
 
+      expected = %{
+        dob: [" 01/02/1970", " 03/04/1990"],
+        first_name: ["Alice ", "Billy "],
+        last_name: [" Ant ", " Bat "]
+      }
+
       assert csv
              |> DF.from_csv!(dtypes: types)
-             |> DF.to_columns(atom_keys: true) == %{
-               dob: [" 01/02/1970", " 03/04/1990"],
-               first_name: ["Alice ", "Billy "],
-               last_name: [" Ant ", " Bat "]
-             }
+             |> DF.to_columns(atom_keys: true) == expected
+
+      assert csv
+             |> DF.from_csv!(dtypes: types, lazy: true)
+             |> DF.collect()
+             |> DF.to_columns(atom_keys: true) == expected
     end
 
     @tag :tmp_dir

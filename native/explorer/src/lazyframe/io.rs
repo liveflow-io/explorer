@@ -5,7 +5,7 @@ use std::io::BufWriter;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use crate::dataframe::io::schema_from_dtypes_pairs;
+use crate::dataframe::io::{schema_and_dtype_pairs, schema_from_dtypes_pairs, CsvDtypePairs};
 use crate::datatypes::{ExParquetCompression, ExQuoteStyle, ExS3Entry, ExSeriesDtype};
 use crate::{ExLazyFrame, ExplorerError};
 
@@ -296,6 +296,7 @@ pub fn lf_from_csv(
 
     let path = PlRefPath::new(filename);
 
+    let (schema_overwrite, dtype_pairs) = schema_and_dtype_pairs(dtypes)?;
     let df = LazyCsvReader::new(path)
         .with_infer_schema_length(infer_schema_length)
         .with_has_header(has_header)
@@ -306,7 +307,7 @@ pub fn lf_from_csv(
         .with_skip_rows_after_header(skip_rows_after_header)
         .with_rechunk(do_rechunk)
         .with_encoding(encoding)
-        .with_dtype_overwrite(schema_from_dtypes_pairs(dtypes)?)
+        .with_dtype_overwrite(schema_overwrite)
         .with_null_values(Some(NullValues::AllColumns(
             null_vals.iter().map(|x| x.into()).collect(),
         )))
@@ -314,7 +315,40 @@ pub fn lf_from_csv(
         .with_quote_char(quote_delimiter)
         .finish()?;
 
-    Ok(ExLazyFrame::new(df))
+    Ok(ExLazyFrame::new(apply_full_dtype_pairs_by_position(
+        df,
+        dtype_pairs,
+    )?))
+}
+
+fn apply_full_dtype_pairs_by_position(
+    mut dataframe: LazyFrame,
+    dtype_pairs: CsvDtypePairs,
+) -> Result<LazyFrame, ExplorerError> {
+    let schema = dataframe.collect_schema()?;
+    if dtype_pairs.len() != schema.len()
+        || dtype_pairs
+            .iter()
+            .all(|(name, _)| schema.contains(name.as_str()))
+    {
+        return Ok(dataframe);
+    }
+
+    let expressions = schema
+        .iter_names()
+        .zip(dtype_pairs)
+        .map(|(existing_name, (requested_name, dtype))| {
+            let expression = col(existing_name.clone());
+            let expression = if matches!(dtype, DataType::Enum(_, _)) {
+                expression.strict_cast(dtype)
+            } else {
+                expression.cast(dtype)
+            };
+            expression.alias(requested_name)
+        })
+        .collect::<Vec<_>>();
+
+    Ok(dataframe.select(expressions))
 }
 
 #[rustler::nif(schedule = "DirtyIo")]

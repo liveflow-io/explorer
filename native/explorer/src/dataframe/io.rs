@@ -27,7 +27,7 @@ use crate::{ExDataFrame, ExplorerError};
 #[cfg(feature = "cloud")]
 use crate::cloud_writer::CloudWriter;
 
-type CsvDtypePairs = Vec<(PlSmallStr, DataType)>;
+pub(crate) type CsvDtypePairs = Vec<(PlSmallStr, DataType)>;
 
 // ============ CSV ============ //
 
@@ -99,7 +99,7 @@ pub fn schema_from_dtypes_pairs(
     schema_and_dtype_pairs(dtypes).map(|(schema, _)| schema)
 }
 
-fn schema_and_dtype_pairs(
+pub(crate) fn schema_and_dtype_pairs(
     dtypes: Vec<(&str, ExSeriesDtype)>,
 ) -> Result<(Option<Arc<Schema>>, CsvDtypePairs), ExplorerError> {
     if dtypes.is_empty() {
