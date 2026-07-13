@@ -22,7 +22,7 @@ reqwest = { version = "0.12", default-features = false }
 rustler = { version = "0.36" }
 thiserror = "2"
 
-object_store = { version = "0.12", default-features = false, optional = true }
+object_store = { version = "0.13", default-features = false, optional = true }
 polars-arrow = "0.54.4"
 polars-lazy = "0.54.4"
 polars-parquet = "0.54.4"
