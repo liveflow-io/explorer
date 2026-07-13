@@ -209,21 +209,7 @@ pub fn lf_sort_with(
         .with_maintain_order(maintain_order)
         .with_order_descending_multi(directions);
 
-    let ldf = data.clone_inner();
-
-    let ldf = if ldf.get_current_optimizations().bits() == OptFlags::TYPE_COERCION.bits() {
-        // Polars 0.54 can crash when sorting a filtered aggregate joined on
-        // differently named keys. The join path marks those plans as
-        // no-optimization; materialize them before sorting to avoid revisiting
-        // the unstable optimized join plan.
-        ldf.collect()?.lazy()
-    } else {
-        ldf
-    };
-
-    let ldf = ldf
-        .sort_by_exprs(exprs, sort_options)
-        .without_optimizations();
+    let ldf = data.clone_inner().sort_by_exprs(exprs, sort_options);
 
     Ok(ExLazyFrame::new(ldf))
 }
@@ -368,7 +354,7 @@ pub fn lf_join(
         }
     };
 
-    let ldf = data.clone_inner().without_optimizations();
+    let ldf = data.clone_inner();
     let ldf1 = other.clone_inner();
 
     let new_ldf = match how {
@@ -392,7 +378,7 @@ pub fn lf_join(
             .finish(),
     };
 
-    Ok(ExLazyFrame::new(new_ldf.without_optimizations()))
+    Ok(ExLazyFrame::new(new_ldf))
 }
 
 #[allow(clippy::too_many_arguments)]
