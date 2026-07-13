@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.13.0] - 2026-07-11
+
+### Added
+
+- Added the `{:enum, categories}` dtype for strings restricted to a fixed set of values.
+
+### Updated
+
+- Updated Polars to 0.54.4.
+- Updated ADBC to 0.12.
+
+### Backwards incompatible changes
+
+- `Series.cut/3` now returns its category column as an enum instead of a categorical series.
+
 ## [v0.12.0] - 2026-07-05
 
 ### Updated
