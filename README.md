@@ -264,36 +264,16 @@ mix test --only cloud_integration
 
 ## Precompilation
 
-Explorer ships with the NIF code precompiled for the most popular architectures out there.
+Explorer ships with the NIF code precompiled for the supported production and development targets.
 We support the following:
 
 - `aarch64-apple-darwin` - MacOS running on ARM 64 bits CPUs.
-- `aarch64-unknown-linux-gnu` - Linux running on ARM 64 bits CPUs, compiled with GCC.
-- `aarch64-unknown-linux-musl` - Linux running on ARM 64 bits CPUs, compiled with Musl.
-- `x86_64-apple-darwin` - MacOS running on Intel/AMD 64 bits CPUs.
-- `x86_64-pc-windows-msvc` - Windows running on Intel/AMD 64 bits CPUs, compiled with Visual C++.
-- `x86_64-pc-windows-gnu` - Windows running on Intel/AMD 64 bits CPUs, compiled with GCC.
 - `x86_64-unknown-linux-gnu` - Linux running on Intel/AMD 64 bits CPUs, compiled with GCC.
-- `x86_64-unknown-linux-musl` - Linux running on Intel/AMD 64 bits CPUs, compiled with Musl.
-- `x86_64-unknown-freebsd` - FreeBSD running on Intel/AMD 64 bits.
 
 This means that Explorer is going to work without the need to compile it from source.
 
 This currently **only works for Hex releases**. For more information on how it works, please
 check the [RustlerPrecompiled project](https://hexdocs.pm/rustler_precompiled).
-
-### Legacy CPUs
-
-We ship some of the precompiled artifacts with modern CPU features enabled by default. But in
-case your computer is not compatible with them, you can set an application environment that is
-going to be read at compile time, enabling the legacy variants of artifacts.
-
-```elixir
-config :explorer, use_legacy_artifacts: true
-```
-
-If you see the error message "Illegal instruction" after your project compiles, you need to
-enable the legacy artifacts.
 
 ### Features disabled
 

@@ -3,6 +3,7 @@ use crate::datatypes::{
     ex_datetime_to_timestamp, ex_naive_datetime_to_timestamp, ExDate, ExDateTime, ExDecimal,
     ExDuration, ExNaiveDateTime, ExSeriesDtype, ExTime, ExTimeUnit,
 };
+use crate::series::cast_enum_strictly;
 use crate::{ExSeries, ExplorerError};
 use std::cmp;
 
@@ -418,6 +419,21 @@ pub fn s_from_list_categories(name: &str, val: Term) -> NifResult<ExSeries> {
                 Error::RaiseTerm(Box::new(message))
             })?,
     ))
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+pub fn s_from_list_enum(
+    name: &str,
+    val: Term,
+    categories: Vec<String>,
+) -> Result<ExSeries, ExplorerError> {
+    let decoded = val.decode::<Vec<Option<String>>>().map_err(|err| {
+        ExplorerError::Other(format!("from_list/2 cannot decode enum values: {err:?}"))
+    })?;
+    let dtype = DataType::try_from(&ExSeriesDtype::Enum(categories))?;
+    let series = Series::new(name.into(), decoded.as_slice());
+
+    Ok(ExSeries::new(cast_enum_strictly(&series, &dtype)?))
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]

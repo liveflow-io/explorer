@@ -3,6 +3,7 @@ use polars::datatypes::CategoricalPhysical;
 use polars::datatypes::Categories;
 use polars::datatypes::DataType;
 use polars::datatypes::Field;
+use polars::datatypes::FrozenCategories;
 use polars::datatypes::PlSmallStr;
 use polars::datatypes::TimeUnit;
 use rustler::NifTaggedEnum;
@@ -42,6 +43,7 @@ pub enum ExSeriesDtype {
     Binary,
     Boolean,
     Category,
+    Enum(Vec<String>),
     Date,
     F(u8),
     S(u8),
@@ -66,6 +68,13 @@ impl TryFrom<&DataType> for ExSeriesDtype {
             DataType::Binary => Ok(ExSeriesDtype::Binary),
             DataType::Boolean => Ok(ExSeriesDtype::Boolean),
             DataType::Categorical(_, _) => Ok(ExSeriesDtype::Category),
+            DataType::Enum(categories, _) => Ok(ExSeriesDtype::Enum(
+                categories
+                    .categories()
+                    .values_iter()
+                    .map(|category| category.to_string())
+                    .collect(),
+            )),
             DataType::Date => Ok(ExSeriesDtype::Date),
             DataType::Float64 => Ok(ExSeriesDtype::F(64)),
             DataType::Float32 => Ok(ExSeriesDtype::F(32)),
@@ -128,6 +137,9 @@ impl TryFrom<&ExSeriesDtype> for DataType {
                 );
                 Ok(DataType::from_categories(cats.clone()))
             }
+            ExSeriesDtype::Enum(categories) => Ok(DataType::from_frozen_categories(
+                FrozenCategories::new(categories.iter().map(|category| category.as_str()))?,
+            )),
             ExSeriesDtype::Date => Ok(DataType::Date),
             ExSeriesDtype::F(64) => Ok(DataType::Float64),
             ExSeriesDtype::F(32) => Ok(DataType::Float32),

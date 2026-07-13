@@ -16,6 +16,21 @@ use rustler::{Binary, Encoder, Env, Term};
 pub mod from_list;
 pub mod log;
 
+pub(crate) fn cast_enum_strictly(
+    series: &Series,
+    dtype: &DataType,
+) -> Result<Series, ExplorerError> {
+    let out = series.cast(dtype)?;
+
+    if matches!(dtype, DataType::Enum(_, _)) && out.null_count() > series.null_count() {
+        return Err(ExplorerError::Other(
+            "invalid enum value: all non-nil values must be present in enum categories".into(),
+        ));
+    }
+
+    Ok(out)
+}
+
 #[rustler::nif]
 pub fn s_as_str(data: ExSeries) -> Result<String, ExplorerError> {
     Ok(format!("{:?}", data.resource.0))
@@ -224,7 +239,6 @@ pub fn s_cut(
 
     if include_breaks {
         let mut cut_df = cut_series.struct_()?.clone().unnest();
-        cut_df.try_apply("category", |s| s.cast(&DataType::String))?;
 
         cut_df.insert_column(0, series.into())?;
 
@@ -237,7 +251,6 @@ pub fn s_cut(
         Ok(ExDataFrame::new(cut_df))
     } else {
         let height = series.len();
-        let cut_series = cut_series.cast(&DataType::String)?;
         let mut cut_df =
             DataFrame::new(height, vec![Column::from(series), Column::from(cut_series)])?;
         cut_df.set_column_names(&["values", category_label.unwrap_or("category")])?;
@@ -271,7 +284,6 @@ pub fn s_qcut(
 
     if include_breaks {
         let mut qcut_df = qcut_series.struct_()?.clone().unnest();
-        qcut_df.try_apply("category", |s| s.cast(&DataType::String))?;
         qcut_df.insert_column(0, series.into())?;
 
         qcut_df.set_column_names(&[
@@ -283,7 +295,6 @@ pub fn s_qcut(
         Ok(ExDataFrame::new(qcut_df))
     } else {
         let height = series.len();
-        let qcut_series = qcut_series.cast(&DataType::String)?;
         let mut qcut_df = DataFrame::new(
             height,
             vec![Column::from(series), Column::from(qcut_series)],
@@ -409,7 +420,9 @@ pub fn s_less_equal(data: ExSeries, rhs: ExSeries) -> Result<ExSeries, ExplorerE
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_in(s: ExSeries, rhs: ExSeries) -> Result<ExSeries, ExplorerError> {
     let s = match s.dtype() {
-        DataType::Categorical(_, _) => is_in(&s, &rhs.implode()?.into(), false)?,
+        DataType::Categorical(_, _) | DataType::Enum(_, _) => {
+            is_in(&s, &rhs.implode()?.into(), false)?
+        }
         _ => is_in(&s, &rhs.cast(s.dtype())?.implode()?.into(), false)?,
     };
 
@@ -1223,7 +1236,7 @@ pub fn s_n_distinct(s: ExSeries) -> Result<usize, ExplorerError> {
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_cast(s: ExSeries, to_type: ExSeriesDtype) -> Result<ExSeries, ExplorerError> {
     let dtype = DataType::try_from(&to_type)?;
-    Ok(ExSeries::new(s.cast(&dtype)?))
+    Ok(ExSeries::new(cast_enum_strictly(&s, &dtype)?))
 }
 
 pub fn cast_str_to_f32(atom: &str) -> f32 {
@@ -1255,7 +1268,11 @@ pub fn s_categories(s: ExSeries) -> Result<ExSeries, ExplorerError> {
                 .collect();
             Ok(ExSeries::new(categories))
         }
-        _ => panic!("Cannot get categories from non categorical series"),
+        DataType::Enum(categories, _) => {
+            let categories: Vec<&str> = categories.categories().values_iter().collect();
+            Ok(ExSeries::new(Series::new("".into(), categories)))
+        }
+        _ => panic!("Cannot get categories from non categorical or enum series"),
     }
 }
 

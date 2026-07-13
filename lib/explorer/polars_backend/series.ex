@@ -14,6 +14,9 @@ defmodule Explorer.PolarsBackend.Series do
   defguardp is_non_finite(n) when n in [:nan, :infinity, :neg_infinity]
   defguardp is_numeric(n) when is_number(n) or is_non_finite(n)
 
+  defguardp is_enum_dtype(dtype)
+            when is_tuple(dtype) and tuple_size(dtype) == 2 and elem(dtype, 0) == :enum
+
   @integer_types Explorer.Shared.integer_types()
 
   # Conversion
@@ -62,8 +65,9 @@ defmodule Explorer.PolarsBackend.Series do
   def size(series), do: Shared.apply_series(series, :s_size)
 
   @impl true
-  def categories(%Series{dtype: :category} = series),
-    do: Shared.apply_series(series, :s_categories)
+  def categories(%Series{dtype: dtype} = series)
+      when dtype == :category or is_enum_dtype(dtype),
+      do: Shared.apply_series(series, :s_categories)
 
   @impl true
   def categorise(%Series{dtype: {integer_type, _}} = series, %Series{dtype: dtype} = categories)

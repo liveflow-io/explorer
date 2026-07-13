@@ -16,6 +16,8 @@ defmodule Explorer.Series do
     * `:binary` - Binaries (sequences of bytes)
     * `:boolean` - Boolean
     * `:category` - Strings but represented internally as integers
+    * `{:enum, categories}` - Strings restricted to the given categories and represented
+      internally as integers
     * `:date` - Date type that unwraps to `Elixir.Date`
     * `{:naive_datetime, precision}` - Naive DateTime type with millisecond/microsecond/nanosecond
       precision that unwraps to `Elixir.NaiveDateTime`
@@ -172,6 +174,7 @@ defmodule Explorer.Series do
           | datetime_dtype
           | decimal_dtype
           | duration_dtype
+          | enum_dtype
           | float_dtype
           | list_dtype
           | naive_datetime_dtype
@@ -181,6 +184,7 @@ defmodule Explorer.Series do
 
   @type time_unit :: :nanosecond | :microsecond | :millisecond
   @type time_zone :: String.t()
+  @type enum_dtype :: {:enum, [String.t()]}
   @type naive_datetime_dtype :: {:naive_datetime, time_unit}
   @type datetime_dtype :: {:datetime, time_unit, time_zone}
   @type duration_dtype :: {:duration, time_unit}
@@ -231,6 +235,11 @@ defmodule Explorer.Series do
                  |> K.and(tuple_size(dtype) == 3)
                  |> K.and(elem(dtype, 0) == :decimal)
                  |> K.and(elem(dtype, 2) |> K.is_integer())
+
+  defguardp is_enum_dtype(dtype)
+            when is_tuple(dtype)
+                 |> K.and(tuple_size(dtype) == 2)
+                 |> K.and(elem(dtype, 0) == :enum)
 
   defguardp is_numeric_dtype(dtype)
             when K.or(K.in(dtype, @numeric_dtypes), is_decimal_dtype(dtype))
@@ -471,6 +480,14 @@ defmodule Explorer.Series do
       #Explorer.Series<
         Polars[3]
         category ["EUA", "Brazil", "Poland"]
+      >
+
+  You can also create an enum series by providing its allowed categories:
+
+      iex> Explorer.Series.from_list(["EUA", "Brazil"], dtype: {:enum, ["EUA", "Brazil", "Poland"]})
+      #Explorer.Series<
+        Polars[2]
+        enum ["EUA", "Brazil"]
       >
 
   If you need to create a series of dates, you can pass `Date` structs, but also
@@ -927,7 +944,7 @@ defmodule Explorer.Series do
   @doc type: :conversion
   @spec to_iovec(series :: Series.t()) :: [binary]
   def to_iovec(%Series{dtype: dtype} = series) do
-    if is_io_dtype(dtype) do
+    if K.or(is_io_dtype(dtype), is_enum_dtype(dtype)) do
       apply_series(series, :to_iovec, [], false)
     else
       raise ArgumentError, "cannot convert series of dtype #{inspect(dtype)} into iovec"
@@ -1294,6 +1311,7 @@ defmodule Explorer.Series do
   def iotype(%Series{dtype: dtype}) do
     case dtype do
       :category -> {:u, 32}
+      {:enum, _categories} -> {:u, 32}
       {:decimal, _, _} -> {:s, 128}
       other -> Shared.dtype_to_iotype(other)
     end
@@ -1324,8 +1342,12 @@ defmodule Explorer.Series do
   """
   @doc type: :introspection
   @spec categories(series :: Series.t()) :: Series.t()
-  def categories(%Series{dtype: :category} = series), do: apply_series(series, :categories)
-  def categories(%Series{dtype: dtype}), do: dtype_error("categories/1", dtype, [:category])
+  def categories(%Series{dtype: dtype} = series)
+      when K.or(dtype == :category, is_enum_dtype(dtype)),
+      do: apply_series(series, :categories)
+
+  def categories(%Series{dtype: dtype}),
+    do: dtype_error("categories/1", dtype, [:category, :enum])
 
   @doc """
   Categorise a series of integers or strings according to `categories`.
@@ -4930,7 +4952,7 @@ defmodule Explorer.Series do
         Polars[3 x 3]
         values f64 [1.0, 2.0, 3.0]
         break_point f64 [1.5, 2.5, Inf]
-        category string ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
+        category enum ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
       >
 
       iex> s = Explorer.Series.from_list([1.0, 2.0, 3.0])
@@ -4938,7 +4960,7 @@ defmodule Explorer.Series do
       #Explorer.DataFrame<
         Polars[3 x 2]
         values f64 [1.0, 2.0, 3.0]
-        category string ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
+        category enum ["(-inf, 1.5]", "(1.5, 2.5]", "(2.5, inf]"]
       >
   """
   @doc type: :aggregation
@@ -4998,7 +5020,7 @@ defmodule Explorer.Series do
       #Explorer.DataFrame<
         Polars[5 x 2]
         values f64 [1.0, 2.0, 3.0, 4.0, 5.0]
-        category string ["(-inf, 2]", "(-inf, 2]", "(2, 4]", "(2, 4]", "(4, inf]"]
+        category category ["(-inf, 2]", "(-inf, 2]", "(2, 4]", "(2, 4]", "(4, inf]"]
       >
   """
   @doc type: :aggregation
