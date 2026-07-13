@@ -705,6 +705,18 @@ defmodule Explorer.DataFrame.LazyTest do
   end
 
   describe "sort_with/2" do
+    @tag :tmp_dir
+    test "does not execute a joined CSV scan", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "lazy-sort.csv")
+      File.write!(path, "id,value\n1,a\n")
+
+      scanned = DF.from_csv!(path, lazy: true)
+      joined = DF.join(scanned, DF.new([id: [1]], lazy: true))
+      File.rm!(path)
+
+      assert %DF{} = DF.sort_with(joined, fn ldf -> [asc: ldf["id"]] end)
+    end
+
     test "with a simple df and asc order" do
       ldf = DF.new([a: [1, 2, 4, 3, 6, 5], b: ["a", "b", "d", "c", "f", "e"]], lazy: true)
       ldf1 = DF.sort_with(ldf, fn ldf -> [asc: ldf["a"]] end)
