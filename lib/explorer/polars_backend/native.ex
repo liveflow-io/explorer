@@ -305,6 +305,7 @@ defmodule Explorer.PolarsBackend.Native do
   def s_distinct(_s), do: err()
   def s_divide(_s, _other), do: err()
   def s_dtype(_s), do: err()
+  def s_same_dtype(_left, _right), do: err()
   def s_equal(_s, _rhs), do: err()
   def s_exp(_s), do: err()
   def s_abs(_s), do: err()

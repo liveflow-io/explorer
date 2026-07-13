@@ -830,27 +830,32 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         DataType::Categorical(_, _) => {
             series_to_iovec!(resource, s.cast(&DataType::UInt32)?.u32()?, env, u32)
         }
-        DataType::Enum(categories, _) => {
-            let enum_categories = categories
-                .categories()
-                .values_iter()
-                .enumerate()
-                .map(|(idx, category)| (category, idx as u32))
-                .collect::<HashMap<_, _>>();
-            let strings = s.cast(&DataType::String)?;
-            let values: Vec<Option<u32>> = strings
-                .str()?
-                .iter()
-                .map(|category| {
-                    category.and_then(|category| enum_categories.get(category).copied())
-                })
-                .collect();
-            let mut bin = OwnedBinary::new(values.len() * mem::size_of::<u32>()).unwrap();
-            for (idx, value) in values.into_iter().enumerate() {
-                let offset = idx * mem::size_of::<u32>();
-                bin.as_mut_slice()[offset..offset + mem::size_of::<u32>()]
-                    .copy_from_slice(&value.unwrap_or_default().to_ne_bytes());
+        DataType::Enum(_, _) => {
+            let physical = s.to_physical_repr();
+            let mut bin = OwnedBinary::new(s.len() * mem::size_of::<u32>()).unwrap();
+
+            macro_rules! write_enum_indices {
+                ($values:expr) => {
+                    for (idx, value) in $values.iter().enumerate() {
+                        let value = u32::from(value.expect("nil enum checked by s_to_iovec"));
+                        let offset = idx * mem::size_of::<u32>();
+                        bin.as_mut_slice()[offset..offset + mem::size_of::<u32>()]
+                            .copy_from_slice(&value.to_ne_bytes());
+                    }
+                };
             }
+
+            match physical.dtype() {
+                DataType::UInt8 => write_enum_indices!(physical.u8()?),
+                DataType::UInt16 => write_enum_indices!(physical.u16()?),
+                DataType::UInt32 => write_enum_indices!(physical.u32()?),
+                dtype => {
+                    return Err(ExplorerError::Other(format!(
+                        "unsupported physical enum dtype: {dtype}"
+                    )))
+                }
+            }
+
             Ok([bin.release(env)].encode(env))
         }
         dt => panic!("to_iovec/1 not implemented for {dt:?}"),
