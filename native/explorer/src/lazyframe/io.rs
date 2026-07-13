@@ -5,7 +5,7 @@ use std::io::BufWriter;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use crate::dataframe::io::{schema_and_dtype_pairs, schema_from_dtypes_pairs, CsvDtypePairs};
+use crate::dataframe::io::{schema_and_dtype_pairs, CsvDtypePairs};
 use crate::datatypes::{ExParquetCompression, ExQuoteStyle, ExS3Entry, ExSeriesDtype};
 use crate::{ExLazyFrame, ExplorerError};
 
