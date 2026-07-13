@@ -354,7 +354,10 @@ pub fn lf_join(
         }
     };
 
-    let ldf = data.clone_inner();
+    // Polars 0.54's expression simplifier can segfault for a filtered
+    // aggregation joined on differently named keys. Keep all other
+    // optimizations, including predicate and projection pushdown.
+    let ldf = data.clone_inner().with_simplify_expr(false);
     let ldf1 = other.clone_inner();
 
     let new_ldf = match how {
