@@ -989,6 +989,30 @@ defmodule Explorer.DataFrame.LazyTest do
       assert ldf1.dtypes == df.dtypes
     end
 
+    test "raises when lazily casting an invalid enum value" do
+      ldf = DF.new([status: ["open", "pending"]], lazy: true)
+
+      ldf =
+        DF.mutate_with(ldf, fn ldf ->
+          [status: Series.cast(ldf["status"], {:enum, ["open", "closed"]})]
+        end)
+
+      assert_raise RuntimeError, ~r/enum/i, fn -> DF.collect(ldf) end
+    end
+
+    test "preserves the dtype of a singleton series expression" do
+      dtype = {:enum, ["open", "closed"]}
+      status = Series.from_list(["open"], dtype: dtype)
+      ldf = DF.new([id: [1, 2]], lazy: true)
+      ldf = DF.mutate_with(ldf, fn _ldf -> [status: status] end)
+
+      assert ldf.dtypes == %{"id" => {:s, 64}, "status" => dtype}
+
+      df = DF.collect(ldf)
+      assert df.dtypes == ldf.dtypes
+      assert DF.to_columns(df) == %{"id" => [1, 2], "status" => ["open", "open"]}
+    end
+
     test "calculates aggregations over groups" do
       ldf = DF.new([a: [1, 16, 2, 3], b: ["a", "a", "b", "c"]], lazy: true)
       ldf1 = DF.group_by(ldf, "b")

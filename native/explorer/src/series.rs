@@ -53,6 +53,11 @@ pub fn s_dtype(data: ExSeries) -> Result<ExSeriesDtype, ExplorerError> {
     ExSeriesDtype::try_from(data.dtype())
 }
 
+#[rustler::nif]
+pub fn s_same_dtype(left: ExSeries, right: ExSeries) -> Result<bool, ExplorerError> {
+    Ok(left.dtype() == right.dtype())
+}
+
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_slice(series: ExSeries, offset: i64, length: usize) -> Result<ExSeries, ExplorerError> {
     Ok(ExSeries::new(series.slice(offset, length)))

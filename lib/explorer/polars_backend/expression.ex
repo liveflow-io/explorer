@@ -411,7 +411,7 @@ defmodule Explorer.PolarsBackend.Expression do
           Native.expr_cast(Native.expr_nil(), series.dtype)
 
         scalar_literal?(value) ->
-          to_expr(value)
+          Native.expr_cast(to_expr(value), series.dtype)
 
         true ->
           Native.expr_series(polars_series)

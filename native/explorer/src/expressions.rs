@@ -100,7 +100,11 @@ pub fn expr_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
     let expr = data.clone_inner();
     let to_dtype = DataType::try_from(&to_dtype).expect("dtype is not valid");
 
-    ExExpr::new(expr.cast(to_dtype))
+    if matches!(to_dtype, DataType::Enum(_, _)) {
+        ExExpr::new(expr.strict_cast(to_dtype))
+    } else {
+        ExExpr::new(expr.cast(to_dtype))
+    }
 }
 
 #[rustler::nif]
