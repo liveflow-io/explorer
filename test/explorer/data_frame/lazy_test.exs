@@ -714,7 +714,16 @@ defmodule Explorer.DataFrame.LazyTest do
       joined = DF.join(scanned, DF.new([id: [1]], lazy: true))
       File.rm!(path)
 
-      assert %DF{} = DF.sort_with(joined, fn ldf -> [asc: ldf["id"]] end)
+      expression = Explorer.PolarsBackend.Native.expr_column("id")
+
+      assert {:ok, %Explorer.PolarsBackend.LazyFrame{}} =
+               Explorer.PolarsBackend.Native.lf_sort_with(
+                 joined.data,
+                 [expression],
+                 [false],
+                 true,
+                 false
+               )
     end
 
     test "with a simple df and asc order" do
@@ -992,12 +1001,12 @@ defmodule Explorer.DataFrame.LazyTest do
     test "raises when lazily casting an invalid enum value" do
       ldf = DF.new([status: ["open", "pending"]], lazy: true)
 
-      ldf =
+      assert_raise RuntimeError, ~r/enum/i, fn ->
         DF.mutate_with(ldf, fn ldf ->
           [status: Series.cast(ldf["status"], {:enum, ["open", "closed"]})]
         end)
-
-      assert_raise RuntimeError, ~r/enum/i, fn -> DF.collect(ldf) end
+        |> DF.collect()
+      end
     end
 
     test "preserves the dtype of a singleton series expression" do
