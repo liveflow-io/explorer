@@ -93,12 +93,6 @@ pub fn df_from_csv(
     Ok(ExDataFrame::new(dataframe))
 }
 
-pub fn schema_from_dtypes_pairs(
-    dtypes: Vec<(&str, ExSeriesDtype)>,
-) -> Result<Option<Arc<Schema>>, ExplorerError> {
-    schema_and_dtype_pairs(dtypes).map(|(schema, _)| schema)
-}
-
 pub(crate) fn schema_and_dtype_pairs(
     dtypes: Vec<(&str, ExSeriesDtype)>,
 ) -> Result<(Option<Arc<Schema>>, CsvDtypePairs), ExplorerError> {
