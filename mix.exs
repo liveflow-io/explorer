@@ -1,8 +1,8 @@
 defmodule Explorer.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/elixir-nx/explorer"
-  @version "0.12.0-dev"
+  @source_url "https://github.com/liveflow-io/explorer"
+  @version "0.13.0"
   @dev? String.ends_with?(@version, "-dev")
   @force_build? System.get_env("EXPLORER_BUILD") in ["1", "true"]
 
