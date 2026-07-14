@@ -1033,6 +1033,17 @@ defmodule Explorer.DataFrame.LazyTest do
       assert DF.to_columns(df) == %{"id" => [1, 2], "status" => ["open", "open"]}
     end
 
+    test "preserves arbitrary bytes in a singleton binary series expression" do
+      payload = Series.from_list([<<255>>], dtype: :binary)
+      ldf = DF.new([id: [1, 2]], lazy: true)
+      ldf = DF.mutate_with(ldf, fn _ldf -> [payload: payload] end)
+
+      assert DF.collect(ldf) |> DF.to_columns() == %{
+               "id" => [1, 2],
+               "payload" => [<<255>>, <<255>>]
+             }
+    end
+
     test "calculates aggregations over groups" do
       ldf = DF.new([a: [1, 16, 2, 3], b: ["a", "a", "b", "c"]], lazy: true)
       ldf1 = DF.group_by(ldf, "b")
