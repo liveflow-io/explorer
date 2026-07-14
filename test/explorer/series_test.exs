@@ -130,6 +130,15 @@ defmodule Explorer.SeriesTest do
              ]
     end
 
+    test "with enum dtype using u32 physical indices" do
+      categories = Enum.map(0..65_536, &"category-#{&1}")
+      s = Series.from_list(["category-0", "category-65536"], dtype: {:enum, categories})
+
+      assert Series.to_iovec(s) == [
+               <<0::unsigned-32-native, 65_536::unsigned-32-native>>
+             ]
+    end
+
     test "with enum dtype raises on invalid values" do
       assert_raise RuntimeError, ~r/invalid enum value/, fn ->
         Series.from_list(["low", "unknown"], dtype: {:enum, ["low", "medium", "high"]})
