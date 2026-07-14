@@ -399,9 +399,9 @@ defmodule Explorer.DataFrame.CSVTest do
     @tag :tmp_dir
     test "dtypes - partially mismatched names raise", config do
       csv = tmp_csv(config.tmp_dir, "a,b\n1,x\n")
-      types = [{"b", :string}, {"typo", :string}]
 
-      for lazy <- [false, true] do
+      for types <- [[{"b", :string}, {"typo", :string}], [{"typo", :string}]],
+          lazy <- [false, true] do
         assert_raise RuntimeError, ~r/must either all match.*or all be positional/, fn ->
           DF.from_csv!(csv, dtypes: types, lazy: lazy)
         end

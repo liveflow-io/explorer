@@ -115,36 +115,33 @@ fn apply_full_dtype_pairs_by_position(
     dataframe: &mut DataFrame,
     dtype_pairs: CsvDtypePairs,
 ) -> Result<(), ExplorerError> {
-    if dtype_pairs.len() == dataframe.width() {
-        let matching_names = dtype_pairs
-            .iter()
-            .filter(|(name, _)| dataframe.try_get_column_index(name.as_str()).is_ok())
-            .count();
+    let matching_names = dtype_pairs
+        .iter()
+        .filter(|(name, _)| dataframe.try_get_column_index(name.as_str()).is_ok())
+        .count();
 
-        if matching_names == dtype_pairs.len() {
-            return Ok(());
-        }
-
-        if matching_names != 0 {
-            return Err(ExplorerError::Other(
-                "dtype column names must either all match the CSV header or all be positional"
-                    .into(),
-            ));
-        }
-
-        let names = dtype_pairs
-            .iter()
-            .map(|(name, _)| name.to_string())
-            .collect::<Vec<_>>();
-
-        for (idx, (_, dtype)) in dtype_pairs.into_iter().enumerate() {
-            dataframe.try_apply_at_idx(idx, |column| {
-                column.as_materialized_series().strict_cast(&dtype)
-            })?;
-        }
-
-        dataframe.set_column_names(&names)?;
+    if matching_names == dtype_pairs.len() {
+        return Ok(());
     }
+
+    if dtype_pairs.len() != dataframe.width() || matching_names != 0 {
+        return Err(ExplorerError::Other(
+            "dtype column names must either all match the CSV header or all be positional".into(),
+        ));
+    }
+
+    let names = dtype_pairs
+        .iter()
+        .map(|(name, _)| name.to_string())
+        .collect::<Vec<_>>();
+
+    for (idx, (_, dtype)) in dtype_pairs.into_iter().enumerate() {
+        dataframe.try_apply_at_idx(idx, |column| {
+            column.as_materialized_series().strict_cast(&dtype)
+        })?;
+    }
+
+    dataframe.set_column_names(&names)?;
 
     Ok(())
 }
