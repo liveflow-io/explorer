@@ -1009,6 +1009,17 @@ defmodule Explorer.DataFrame.LazyTest do
       end
     end
 
+    test "raises when lazily casting an invalid nested enum value" do
+      ldf = DF.new([statuses: [["open"], ["pending"]]], lazy: true)
+
+      assert_raise RuntimeError, ~r/enum/i, fn ->
+        DF.mutate_with(ldf, fn ldf ->
+          [statuses: Series.cast(ldf["statuses"], {:list, {:enum, ["open", "closed"]}})]
+        end)
+        |> DF.collect()
+      end
+    end
+
     test "preserves the dtype of a singleton series expression" do
       dtype = {:enum, ["open", "closed"]}
       status = Series.from_list(["open"], dtype: dtype)

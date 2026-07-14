@@ -5,8 +5,8 @@
 // wrapped in an Elixir struct.
 
 use crate::datatypes::{
-    ExCorrelationMethod, ExDate, ExDateTime, ExDuration, ExNaiveDateTime, ExRankMethod,
-    ExSeriesDtype, ExValidValue,
+    contains_enum, ExCorrelationMethod, ExDate, ExDateTime, ExDuration, ExNaiveDateTime,
+    ExRankMethod, ExSeriesDtype, ExValidValue,
 };
 use crate::series::{cast_str_to_f64, ewm_opts, rolling_opts_fixed_window};
 use crate::{ExDataFrame, ExExpr, ExSeries};
@@ -100,7 +100,7 @@ pub fn expr_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
     let expr = data.clone_inner();
     let to_dtype = DataType::try_from(&to_dtype).expect("dtype is not valid");
 
-    if matches!(to_dtype, DataType::Enum(_, _)) {
+    if contains_enum(&to_dtype) {
         ExExpr::new(expr.strict_cast(to_dtype))
     } else {
         ExExpr::new(expr.cast(to_dtype))
