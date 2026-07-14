@@ -410,7 +410,12 @@ defmodule Explorer.PolarsBackend.Expression do
         is_nil(value) ->
           Native.expr_cast(Native.expr_nil(), series.dtype)
 
-        scalar_literal?(value) and series.dtype != :binary ->
+        series.dtype == :binary ->
+          polars_series
+          |> Native.expr_series()
+          |> Native.expr_first()
+
+        scalar_literal?(value) ->
           Native.expr_cast(to_expr(value), series.dtype)
 
         true ->
