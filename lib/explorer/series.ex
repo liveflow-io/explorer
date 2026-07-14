@@ -4589,8 +4589,9 @@ defmodule Explorer.Series do
 
   defp cast_to_comparable_series(:category, value) when is_binary(value), do: :string
 
-  defp cast_to_comparable_series(dtype, value) when is_enum_dtype(dtype) and is_binary(value),
-    do: :string
+  defp cast_to_comparable_series(dtype, value)
+       when K.and(is_enum_dtype(dtype), is_binary(value)),
+       do: :string
 
   defp cast_to_comparable_series(:string, value) when is_binary(value), do: :string
   defp cast_to_comparable_series(:binary, value) when is_binary(value), do: :binary
