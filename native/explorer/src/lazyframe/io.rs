@@ -326,10 +326,6 @@ fn apply_full_dtype_pairs_by_position(
     dtype_pairs: CsvDtypePairs,
 ) -> Result<LazyFrame, ExplorerError> {
     let schema = dataframe.collect_schema()?;
-    if dtype_pairs.len() != schema.len() {
-        return Ok(dataframe);
-    }
-
     let matching_names = dtype_pairs
         .iter()
         .filter(|(name, _)| schema.contains(name.as_str()))
@@ -339,7 +335,7 @@ fn apply_full_dtype_pairs_by_position(
         return Ok(dataframe);
     }
 
-    if matching_names != 0 {
+    if dtype_pairs.len() != schema.len() || matching_names != 0 {
         return Err(ExplorerError::Other(
             "dtype column names must either all match the CSV header or all be positional".into(),
         ));
