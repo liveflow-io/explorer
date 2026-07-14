@@ -397,6 +397,30 @@ defmodule Explorer.DataFrame.CSVTest do
     end
 
     @tag :tmp_dir
+    test "dtypes - partially mismatched names raise", config do
+      csv = tmp_csv(config.tmp_dir, "a,b\n1,x\n")
+      types = [{"b", :string}, {"typo", :string}]
+
+      for lazy <- [false, true] do
+        assert_raise RuntimeError, ~r/must either all match.*or all be positional/, fn ->
+          DF.from_csv!(csv, dtypes: types, lazy: lazy)
+        end
+      end
+    end
+
+    @tag :tmp_dir
+    test "dtypes - positional casts are strict", config do
+      csv = tmp_csv(config.tmp_dir, "age \n1\nbad\n")
+
+      for lazy <- [false, true] do
+        assert_raise RuntimeError, ~r/conversion|cast|parse/i, fn ->
+          df = DF.from_csv!(csv, dtypes: [{"age", {:s, 64}}], lazy: lazy)
+          if lazy, do: DF.collect(df)
+        end
+      end
+    end
+
+    @tag :tmp_dir
     test "dtypes - all as strings", config do
       csv =
         tmp_csv(config.tmp_dir, """

@@ -326,25 +326,32 @@ fn apply_full_dtype_pairs_by_position(
     dtype_pairs: CsvDtypePairs,
 ) -> Result<LazyFrame, ExplorerError> {
     let schema = dataframe.collect_schema()?;
-    if dtype_pairs.len() != schema.len()
-        || dtype_pairs
-            .iter()
-            .all(|(name, _)| schema.contains(name.as_str()))
-    {
+    if dtype_pairs.len() != schema.len() {
         return Ok(dataframe);
+    }
+
+    let matching_names = dtype_pairs
+        .iter()
+        .filter(|(name, _)| schema.contains(name.as_str()))
+        .count();
+
+    if matching_names == dtype_pairs.len() {
+        return Ok(dataframe);
+    }
+
+    if matching_names != 0 {
+        return Err(ExplorerError::Other(
+            "dtype column names must either all match the CSV header or all be positional".into(),
+        ));
     }
 
     let expressions = schema
         .iter_names()
         .zip(dtype_pairs)
         .map(|(existing_name, (requested_name, dtype))| {
-            let expression = col(existing_name.clone());
-            let expression = if matches!(dtype, DataType::Enum(_, _)) {
-                expression.strict_cast(dtype)
-            } else {
-                expression.cast(dtype)
-            };
-            expression.alias(requested_name)
+            col(existing_name.clone())
+                .strict_cast(dtype)
+                .alias(requested_name)
         })
         .collect::<Vec<_>>();
 

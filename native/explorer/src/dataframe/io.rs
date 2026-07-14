@@ -116,12 +116,20 @@ fn apply_full_dtype_pairs_by_position(
     dtype_pairs: CsvDtypePairs,
 ) -> Result<(), ExplorerError> {
     if dtype_pairs.len() == dataframe.width() {
-        let can_apply_by_name = dtype_pairs
+        let matching_names = dtype_pairs
             .iter()
-            .all(|(name, _)| dataframe.try_get_column_index(name.as_str()).is_ok());
+            .filter(|(name, _)| dataframe.try_get_column_index(name.as_str()).is_ok())
+            .count();
 
-        if can_apply_by_name {
+        if matching_names == dtype_pairs.len() {
             return Ok(());
+        }
+
+        if matching_names != 0 {
+            return Err(ExplorerError::Other(
+                "dtype column names must either all match the CSV header or all be positional"
+                    .into(),
+            ));
         }
 
         let names = dtype_pairs
@@ -130,8 +138,9 @@ fn apply_full_dtype_pairs_by_position(
             .collect::<Vec<_>>();
 
         for (idx, (_, dtype)) in dtype_pairs.into_iter().enumerate() {
-            dataframe
-                .try_apply_at_idx(idx, |column| column.as_materialized_series().cast(&dtype))?;
+            dataframe.try_apply_at_idx(idx, |column| {
+                column.as_materialized_series().strict_cast(&dtype)
+            })?;
         }
 
         dataframe.set_column_names(&names)?;
