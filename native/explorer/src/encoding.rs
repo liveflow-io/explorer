@@ -832,6 +832,11 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         }
         DataType::Enum(_, _) => {
             let physical = s.to_physical_repr();
+
+            if matches!(physical.dtype(), DataType::UInt32) {
+                return series_to_iovec!(resource, physical.u32()?, env, u32);
+            }
+
             let mut bin = OwnedBinary::new(s.len() * mem::size_of::<u32>()).unwrap();
 
             macro_rules! write_enum_indices {
@@ -848,7 +853,6 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
             match physical.dtype() {
                 DataType::UInt8 => write_enum_indices!(physical.u8()?),
                 DataType::UInt16 => write_enum_indices!(physical.u16()?),
-                DataType::UInt32 => write_enum_indices!(physical.u32()?),
                 dtype => {
                     return Err(ExplorerError::Other(format!(
                         "unsupported physical enum dtype: {dtype}"
