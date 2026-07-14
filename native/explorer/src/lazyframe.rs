@@ -354,10 +354,17 @@ pub fn lf_join(
         }
     };
 
+    let left_on = ex_expr_to_exprs(left_on);
+    let right_on = ex_expr_to_exprs(right_on);
+
     // Polars 0.54's expression simplifier can segfault for a filtered
-    // aggregation joined on differently named keys. Keep all other
-    // optimizations, including predicate and projection pushdown.
-    let ldf = data.clone_inner().with_simplify_expr(false);
+    // aggregation joined on differently named keys. Keep simplification
+    // enabled for the common case where both sides use identical keys.
+    let ldf = if left_on == right_on {
+        data.clone_inner()
+    } else {
+        data.clone_inner().with_simplify_expr(false)
+    };
     let ldf1 = other.clone_inner();
 
     let new_ldf = match how {
@@ -374,8 +381,8 @@ pub fn lf_join(
             .join_builder()
             .with(ldf1)
             .how(how)
-            .left_on(ex_expr_to_exprs(left_on))
-            .right_on(ex_expr_to_exprs(right_on))
+            .left_on(left_on)
+            .right_on(right_on)
             .suffix(&opts.suffix)
             .join_nulls(opts.nulls_equal)
             .finish(),
