@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{
-        ex_naive_datetime_to_timestamp, ExCorrelationMethod, ExDate, ExDecimal, ExNaiveDateTime,
-        ExRankMethod, ExSeriesDtype, ExTime, ExTimeUnit, ExValidValue,
+        contains_enum, ex_naive_datetime_to_timestamp, ExCorrelationMethod, ExDate, ExDecimal,
+        ExNaiveDateTime, ExRankMethod, ExSeriesDtype, ExTime, ExTimeUnit, ExValidValue,
     },
     encoding, ExDataFrame, ExSeries, ExplorerError,
 };
@@ -20,15 +20,15 @@ pub(crate) fn cast_enum_strictly(
     series: &Series,
     dtype: &DataType,
 ) -> Result<Series, ExplorerError> {
-    let out = series.cast(dtype)?;
-
-    if matches!(dtype, DataType::Enum(_, _)) && out.null_count() > series.null_count() {
-        return Err(ExplorerError::Other(
-            "invalid enum value: all non-nil values must be present in enum categories".into(),
-        ));
+    if contains_enum(dtype) {
+        series.strict_cast(dtype).map_err(|error| {
+            ExplorerError::Other(format!(
+                "invalid enum value: all non-nil values must be present in enum categories ({error})"
+            ))
+        })
+    } else {
+        series.cast(dtype).map_err(Into::into)
     }
-
-    Ok(out)
 }
 
 #[rustler::nif]

@@ -1004,6 +1004,15 @@ defmodule Explorer.SeriesTest do
       assert Series.equal(s, "a") |> Series.to_list() == [true, false, false, nil, true]
     end
 
+    test "compare enums with strings" do
+      enum = Series.from_list(["open", "closed"], dtype: {:enum, ["open", "closed"]})
+      strings = Series.from_list(["open", "open"])
+
+      assert enum |> Series.equal("open") |> Series.to_list() == [true, false]
+      assert "open" |> Series.equal(enum) |> Series.to_list() == [true, false]
+      assert enum |> Series.equal(strings) |> Series.to_list() == [true, false]
+    end
+
     test "compare decimal series" do
       s1 = Series.from_list([1, 0, 2], dtype: {:decimal, 38, 2})
       s2 = Series.from_list([1, 0, 3], dtype: {:decimal, 38, 2})
@@ -4490,6 +4499,14 @@ defmodule Explorer.SeriesTest do
     test "string series to enum raises on invalid values" do
       assert_raise RuntimeError, ~r/invalid enum value/, fn ->
         Series.from_list(["apple", "orange"]) |> Series.cast({:enum, ["apple", "banana"]})
+      end
+    end
+
+    test "nested enum casts raise on invalid values" do
+      series = Series.from_list([["open"], ["pending"]])
+
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.cast(series, {:list, {:enum, ["open", "closed"]}})
       end
     end
 

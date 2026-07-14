@@ -59,6 +59,15 @@ pub enum ExSeriesDtype {
     Decimal(Option<usize>, Option<usize>),
 }
 
+pub fn contains_enum(dtype: &DataType) -> bool {
+    match dtype {
+        DataType::Enum(_, _) => true,
+        DataType::List(inner) | DataType::Array(inner, _) => contains_enum(inner),
+        DataType::Struct(fields) => fields.iter().any(|field| contains_enum(field.dtype())),
+        _ => false,
+    }
+}
+
 impl TryFrom<&DataType> for ExSeriesDtype {
     type Error = ExplorerError;
 

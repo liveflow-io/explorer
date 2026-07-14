@@ -4581,11 +4581,17 @@ defmodule Explorer.Series do
 
   defp valid_comparable_series?(:category, :string), do: true
   defp valid_comparable_series?(:string, :category), do: true
+  defp valid_comparable_series?(dtype, :string) when is_enum_dtype(dtype), do: true
+  defp valid_comparable_series?(:string, dtype) when is_enum_dtype(dtype), do: true
 
   defp valid_comparable_series?(left_dtype, right_dtype),
     do: valid_ordered_series?(left_dtype, right_dtype)
 
   defp cast_to_comparable_series(:category, value) when is_binary(value), do: :string
+
+  defp cast_to_comparable_series(dtype, value) when is_enum_dtype(dtype) and is_binary(value),
+    do: :string
+
   defp cast_to_comparable_series(:string, value) when is_binary(value), do: :string
   defp cast_to_comparable_series(:binary, value) when is_binary(value), do: :binary
   defp cast_to_comparable_series(:boolean, value) when is_boolean(value), do: :boolean
