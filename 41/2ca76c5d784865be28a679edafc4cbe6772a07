@@ -1,0 +1,126 @@
+native/explorer/src/series/from_list.rs
+  s_e571ac1c413b14::t_610efabf971b4a 480
+native/explorer/src/encoding.rs
+  s_e571ac1c413b14::t_2a75c796cb59ea 572,615,807
+  s_e571ac1c413b14::t_ffd86668304b4d 782
+  s_e571ac1c413b14::t_6a85715f12d023 644
+native/explorer/src/lazyframe/io.rs
+  s_e571ac1c413b14::t_35516c287c543d 1,6,29,54,57,95,97,104-110,144,146,148,154-160,179,207-208,214-220,254-255,257,262-268,297,375,378-379,382,387-393,422
+native/explorer/src/expressions.rs
+  s_e571ac1c413b14::t_4f5f1777de5e6d 549-553
+  s_e571ac1c413b14::t_1950cfa16449c9 1215
+  s_e571ac1c413b14::t_60eb3c38bb31f6 185,243,488
+test/explorer/data_frame/csv_test.exs
+  s_e571ac1c413b14::t_755ba752dd1768 369-382,389-390,421-422
+native/explorer/rust-toolchain.toml
+  s_e571ac1c413b14::t_9183469a98293d 4
+test/explorer/data_frame/grouped_test.exs
+  s_03096191e40320::t_03c4417092ebb7 599-619
+  s_721234a911eafb::t_462a2ed7beb790 1234-1260,1262-1272
+  s_721234a911eafb::t_79eb2fb30b8fee 1261
+native/explorer/src/lazyframe.rs
+  s_721234a911eafb::t_0a5cacfeda078e 455-458
+  s_e571ac1c413b14::t_6a85715f12d023 174-180
+  s_e571ac1c413b14::t_7c5305f5f1cde8 6-7,160-166
+  s_e571ac1c413b14::t_55333d1d06bdbf 327-328,502
+  s_e571ac1c413b14::t_28121164ac7a21 5,8-9
+  s_e571ac1c413b14::t_16fe5b89672da8 228-229
+native/explorer/src/datatypes.rs
+  s_e571ac1c413b14::t_10a8eb341f174d 22
+  s_e571ac1c413b14::t_5d88c64da64b71 6
+native/explorer/src/dataframe.rs
+  s_e571ac1c413b14::t_b02038c7b62ad6 1,436
+  s_e571ac1c413b14::t_6a85715f12d023 465-467
+  s_e571ac1c413b14::t_b4055f8a032291 6,104,123,396,414,432,468-475,477-481
+  s_e571ac1c413b14::t_4f36c310619325 215,218-221,239-240,243-247
+  s_e571ac1c413b14::t_26d726ec41ad0d 476
+native/explorer/src/series.rs
+  s_e571ac1c413b14::t_6a85715f12d023 303-306,1440
+  s_e571ac1c413b14::t_bad03c3bd7d0a8 248,250,256,258,259-261,263,292,294,300,302,307-309,959
+  s_e571ac1c413b14::t_55037af16d2c11 1061-1063
+  s_9b1d3bcb0c967a::t_24cd1406bece74 1421-1431
+  s_e571ac1c413b14::t_9f7b38d3920caa 1321,1335-1336
+lib/explorer/polars_backend/lazy_frame.ex
+  s_721234a911eafb::t_7080844a6ed2f6 638-645,651-656
+  s_03096191e40320::t_709f9274e8f3b7 11,504,509,516-517
+native/explorer/src/dataframe/io.rs
+  s_e571ac1c413b14::t_563a9bebcc5bd6 237,239-240,266-268,270
+  s_e571ac1c413b14::t_4c5c11f0c1d444 59-62,89-90,93,97,100,104,107-109,111
+  s_e571ac1c413b14::t_3f74b1e80aba0c 31,98,116
+  s_e571ac1c413b14::t_dde884cf0f38e8 91
+  s_e571ac1c413b14::t_a72947a7f2d006 114-115,117,131-132,146
+test/explorer/series_test.exs
+  s_9b1d3bcb0c967a::t_310dcaa28247d6 4028-4036
+  s_e571ac1c413b14::t_a8f01ebd66a5e9 6866
+native/explorer/Cargo.toml
+  s_e571ac1c413b14::t_8742fe4b28007b 30-34
+  h_a788fab786425d 10,18,21,55,57,63,77,89,94,97,100-101
+  s_e571ac1c413b14::t_d921d6f46b696c 26-27,37,88
+  s_e571ac1c413b14::t_4bda17fdbaeeb9 28
+lib/explorer/polars_backend/expression.ex
+  s_721234a911eafb::t_67941e67e5a524 407,424
+  s_03096191e40320::t_6ebfb461399d21 233,243-244
+  s_721234a911eafb::t_c4076d1624f4ed 406,427-428
+  s_03096191e40320::t_6402bf4eefdb5d 197-232,234-241,246-247,404
+  s_721234a911eafb::t_81ab12dfc4442e 442-452
+  s_721234a911eafb::t_a89bbfe59559e2 408-412,418,420-423,425-426
+lib/explorer/polars_backend/data_frame.ex
+  s_f40309dcf9a734::t_c40943778de2ad 25
+test/explorer/data_frame_test.exs
+  s_f40309dcf9a734::t_3aeda4e6f6d1a5 41-50
+mix.lock
+  s_f40309dcf9a734::t_5e631be60d9b73 2,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "412ca76c5d784865be28a679edafc4cbe6772a07",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  },
+  "sessions": {
+    "s_03096191e40320": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a5d84b6-50f6-497f-b901-5d0d7903767a",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    },
+    "s_721234a911eafb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "cb3b5e79-ab3d-48d2-8794-e927eb9fd17b",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    },
+    "s_9b1d3bcb0c967a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "65f4ce7f-2b7f-4dfa-8a05-5378b959b9a7",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    },
+    "s_e571ac1c413b14": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "190e583a-152c-4288-be85-5c5ddd92ac45",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    },
+    "s_f40309dcf9a734": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "90b664ab-e8d9-44bd-89cd-cd9b47c25a34",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
