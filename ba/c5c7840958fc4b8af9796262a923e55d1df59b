@@ -1,0 +1,14 @@
+checksum-Elixir.Explorer.PolarsBackend.Native.exs
+  h_a788fab786425d 3,5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bac5c7840958fc4b8af9796262a923e55d1df59b",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
