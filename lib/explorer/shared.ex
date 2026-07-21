@@ -4,6 +4,8 @@ defmodule Explorer.Shared do
 
   require Logger
 
+  alias Explorer.EnumDomain
+
   @integer_types [
     {:s, 8},
     {:s, 16},
@@ -83,9 +85,12 @@ defmodule Explorer.Shared do
   def normalise_dtype({:datetime, p, tz} = dtype) when p in @precisions and is_binary(tz),
     do: dtype
 
+  def normalise_dtype({:enum, %EnumDomain{} = domain}), do: {:enum, domain}
+
   def normalise_dtype({:enum, categories}) when is_list(categories) do
-    if Enum.all?(categories, &is_binary/1) and Enum.uniq(categories) == categories do
-      {:enum, categories}
+    case EnumDomain.new(categories) do
+      {:ok, domain} -> {:enum, domain}
+      {:error, _reason} -> nil
     end
   end
 
@@ -123,6 +128,86 @@ defmodule Explorer.Shared do
   end
 
   def normalise_dtype(_dtype), do: nil
+
+  @doc false
+  def external_dtype(dtype), do: elem(external_dtype(dtype, %{}), 0)
+
+  @doc false
+  def external_dtypes(dtypes) do
+    {dtypes, _cache} =
+      Enum.reduce(dtypes, {%{}, %{}}, fn {name, dtype}, {dtypes, cache} ->
+        {dtype, cache} = external_dtype(dtype, cache)
+        {Map.put(dtypes, name, dtype), cache}
+      end)
+
+    dtypes
+  end
+
+  defp external_dtype({:enum, %EnumDomain{} = domain}, cache) do
+    cached_domains = Map.get(cache, domain.fingerprint, [])
+
+    case Enum.find(cached_domains, fn {cached_domain, _categories} ->
+           EnumDomain.equal?(domain, cached_domain)
+         end) do
+      {_domain, categories} ->
+        {{:enum, categories}, cache}
+
+      nil ->
+        categories = EnumDomain.categories(domain)
+        cache = Map.put(cache, domain.fingerprint, [{domain, categories} | cached_domains])
+        {{:enum, categories}, cache}
+    end
+  end
+
+  defp external_dtype({:list, inner}, cache) do
+    {inner, cache} = external_dtype(inner, cache)
+    {{:list, inner}, cache}
+  end
+
+  defp external_dtype({:struct, fields}, cache) do
+    {fields, cache} =
+      Enum.map_reduce(fields, cache, fn {name, dtype}, cache ->
+        {dtype, cache} = external_dtype(dtype, cache)
+        {{name, dtype}, cache}
+      end)
+
+    {{:struct, fields}, cache}
+  end
+
+  defp external_dtype(dtype, cache), do: {dtype, cache}
+
+  @doc false
+  def dtype_equal?(dtype, dtype), do: true
+
+  def dtype_equal?({:enum, %EnumDomain{} = left}, {:enum, %EnumDomain{} = right}),
+    do: EnumDomain.equal?(left, right)
+
+  def dtype_equal?({:list, left}, {:list, right}), do: dtype_equal?(left, right)
+  def dtype_equal?({:struct, left}, {:struct, right}), do: struct_dtypes_equal?(left, right)
+
+  def dtype_equal?(_left, _right), do: false
+
+  defp struct_dtypes_equal?([], []), do: true
+
+  defp struct_dtypes_equal?(
+         [{name, left_dtype} | left],
+         [{name, right_dtype} | right]
+       ),
+       do: dtype_equal?(left_dtype, right_dtype) and struct_dtypes_equal?(left, right)
+
+  defp struct_dtypes_equal?(_left, _right), do: false
+
+  @doc false
+  def dtype_map_equal?(left, right) when map_size(left) == map_size(right) do
+    Enum.all?(left, fn {name, dtype} ->
+      case right do
+        %{^name => right_dtype} -> dtype_equal?(dtype, right_dtype)
+        %{} -> false
+      end
+    end)
+  end
+
+  def dtype_map_equal?(_left, _right), do: false
 
   @doc """
   Normalise a given dtype, but raise error in case it's invalid.
@@ -245,6 +330,7 @@ defmodule Explorer.Shared do
 
   def to_existing_columns(%{names: names, dtypes: dtypes}, callback, _raise?)
       when is_function(callback, 2) do
+    dtypes = external_dtypes(dtypes)
     Enum.filter(names, fn name -> callback.(name, dtypes[name]) end)
   end
 
@@ -392,10 +478,14 @@ defmodule Explorer.Shared do
   @doc """
   Merge two dtypes.
   """
-  def merge_dtype(dtype, dtype), do: dtype
-  def merge_dtype(:null, dtype), do: dtype
-  def merge_dtype(dtype, :null), do: dtype
-  def merge_dtype(ltype, rtype), do: merge_numeric_dtype(ltype, rtype)
+  def merge_dtype(ltype, rtype) do
+    cond do
+      dtype_equal?(ltype, rtype) -> ltype
+      ltype == :null -> rtype
+      rtype == :null -> ltype
+      true -> merge_numeric_dtype(ltype, rtype)
+    end
+  end
 
   @doc """
   Merge two numeric dtypes to a valid precision.

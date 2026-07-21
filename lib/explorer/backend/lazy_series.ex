@@ -11,6 +11,9 @@ defmodule Explorer.Backend.LazySeries do
 
   defstruct op: nil, args: [], dtype: nil, aggregation: false, backend: nil, resource: nil
 
+  defguardp is_enum_dtype(dtype)
+            when is_tuple(dtype) and tuple_size(dtype) == 2 and elem(dtype, 0) == :enum
+
   @type t :: %__MODULE__{
           op: atom(),
           args: list(),
@@ -423,11 +426,11 @@ defmodule Explorer.Backend.LazySeries do
         [data!(left), data!(right)]
 
       {%Series{dtype: dtype}, value}
-      when dtype in [:binary, :string, :category] and is_binary(value) ->
+      when (dtype in [:binary, :string, :category] or is_enum_dtype(dtype)) and is_binary(value) ->
         [data!(left), from_list([value], dtype).data]
 
       {value, %Series{dtype: dtype}}
-      when dtype in [:binary, :string, :category] and is_binary(value) ->
+      when (dtype in [:binary, :string, :category] or is_enum_dtype(dtype)) and is_binary(value) ->
         [from_list([value], dtype).data, data!(right)]
 
       {%Series{}, other} ->
@@ -1026,8 +1029,7 @@ defmodule Explorer.Backend.LazySeries do
     close = A.color(")", :list, opts)
 
     dtype =
-      series
-      |> Series.dtype()
+      series.dtype
       |> Explorer.Shared.dtype_to_string()
       |> A.color(:atom, opts)
 

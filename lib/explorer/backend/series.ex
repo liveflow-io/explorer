@@ -8,7 +8,7 @@ defmodule Explorer.Backend.Series do
   @type s :: Explorer.Series.t()
   @type lazy_s :: Explorer.Series.lazy_t()
   @type df :: Explorer.DataFrame.t()
-  @type dtype :: Explorer.Series.dtype()
+  @type dtype :: Explorer.Series.internal_dtype()
 
   @type valid_types ::
           number()
@@ -369,8 +369,7 @@ defmodule Explorer.Backend.Series do
     close = A.color("]", :list, inspect_opts)
 
     type =
-      series
-      |> Series.dtype()
+      series.dtype
       |> Explorer.Shared.dtype_to_string()
 
     dtype = A.color("#{type} ", :atom, inspect_opts)

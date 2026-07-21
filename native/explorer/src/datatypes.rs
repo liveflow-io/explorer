@@ -1,6 +1,7 @@
 mod ex_dtypes;
 
 use crate::atoms;
+use crate::encoding;
 use crate::ExplorerError;
 use chrono::prelude::*;
 use chrono::TimeZone;
@@ -8,9 +9,12 @@ use chrono::TimeZone;
 #[cfg(feature = "cloud")]
 use polars::prelude::cloud::CloudOptions;
 use polars::prelude::*;
-use rustler::{Atom, NifStruct, NifTaggedEnum, Resource, ResourceArc};
+use rustler::{Atom, Env, NifStruct, NifTaggedEnum, Resource, ResourceArc, Term};
+use std::collections::{hash_map::DefaultHasher, VecDeque};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 #[cfg(feature = "aws")]
 use std::str::FromStr;
@@ -51,6 +55,111 @@ pub struct ExSeriesRef(pub Series);
 
 #[rustler::resource_impl]
 impl Resource for ExSeriesRef {}
+
+pub struct ExEnumDomainRef(pub Arc<FrozenCategories>);
+
+#[rustler::resource_impl]
+impl Resource for ExEnumDomainRef {}
+
+const ENUM_DOMAIN_CACHE_CAPACITY: usize = 128;
+type EnumDomainCache = VecDeque<(u64, Weak<FrozenCategories>)>;
+static ENUM_DOMAIN_CACHE: OnceLock<Mutex<EnumDomainCache>> = OnceLock::new();
+
+fn cached_enum_domains(cache: &mut EnumDomainCache, cache_key: u64) -> Vec<Arc<FrozenCategories>> {
+    cache.retain(|(_, domain)| domain.strong_count() > 0);
+
+    cache
+        .iter()
+        .filter(|(hash, _domain)| *hash == cache_key)
+        .filter_map(|(_hash, domain)| domain.upgrade())
+        .collect()
+}
+
+fn cache_enum_domain(cache: &mut EnumDomainCache, cache_key: u64, domain: &Arc<FrozenCategories>) {
+    cache.retain(|(_, cached_domain)| cached_domain.strong_count() > 0);
+
+    if let Some(index) = cache.iter().position(|(_hash, cached_domain)| {
+        cached_domain
+            .upgrade()
+            .is_some_and(|cached_domain| Arc::ptr_eq(&cached_domain, domain))
+    }) {
+        cache.remove(index);
+    }
+
+    cache.push_back((cache_key, Arc::downgrade(domain)));
+
+    if cache.len() > ENUM_DOMAIN_CACHE_CAPACITY {
+        cache.pop_front();
+    }
+}
+
+#[derive(NifStruct, Clone)]
+#[module = "Explorer.EnumDomain"]
+pub struct ExEnumDomain {
+    pub resource: ResourceArc<ExEnumDomainRef>,
+    pub size: usize,
+    pub fingerprint: u64,
+}
+
+impl std::panic::RefUnwindSafe for ExEnumDomain {}
+
+impl fmt::Debug for ExEnumDomain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExEnumDomain")
+            .field("size", &self.size)
+            .field("fingerprint", &self.fingerprint)
+            .finish()
+    }
+}
+
+impl ExEnumDomain {
+    pub fn new(categories: Arc<FrozenCategories>) -> Self {
+        Self {
+            size: categories.categories().len(),
+            fingerprint: categories.hash(),
+            resource: ResourceArc::new(ExEnumDomainRef(categories)),
+        }
+    }
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+pub fn enum_domain_new(categories: Term) -> Result<ExEnumDomain, ExplorerError> {
+    let categories = categories.decode::<Vec<&str>>().map_err(|error| {
+        ExplorerError::Other(format!("enum categories must be strings ({error:?})"))
+    })?;
+
+    let mut hasher = DefaultHasher::new();
+    categories.hash(&mut hasher);
+    let cache_key = hasher.finish();
+
+    let cache = ENUM_DOMAIN_CACHE.get_or_init(|| Mutex::new(VecDeque::new()));
+
+    let cached_domains = cached_enum_domains(&mut cache.lock().unwrap(), cache_key);
+
+    if let Some(domain) = cached_domains.into_iter().find(|domain| {
+        domain
+            .categories()
+            .values_iter()
+            .eq(categories.iter().copied())
+    }) {
+        return Ok(ExEnumDomain::new(domain));
+    }
+
+    let domain = FrozenCategories::new(categories.iter().copied())?;
+
+    cache_enum_domain(&mut cache.lock().unwrap(), cache_key, &domain);
+    Ok(ExEnumDomain::new(domain))
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+pub fn enum_domain_categories(env: Env, domain: ExEnumDomain) -> Term {
+    encoding::string_list_from_iter(domain.resource.0.categories().values_iter(), env)
+}
+
+#[rustler::nif]
+pub fn enum_domain_equal(left: ExEnumDomain, right: ExEnumDomain) -> bool {
+    Arc::ptr_eq(&left.resource.0, &right.resource.0)
+}
 
 // The structs that start with "Ex" are related to the modules in Elixir.
 // Some of them are just wrappers around Polars data structs.

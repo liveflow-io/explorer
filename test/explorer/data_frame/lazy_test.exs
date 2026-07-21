@@ -1026,7 +1026,7 @@ defmodule Explorer.DataFrame.LazyTest do
       ldf = DF.new([id: [1, 2]], lazy: true)
       ldf = DF.mutate_with(ldf, fn _ldf -> [status: status] end)
 
-      assert ldf.dtypes == %{"id" => {:s, 64}, "status" => dtype}
+      assert DF.dtypes(ldf) == %{"id" => {:s, 64}, "status" => dtype}
 
       df = DF.collect(ldf)
       assert df.dtypes == ldf.dtypes

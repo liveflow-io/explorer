@@ -574,7 +574,7 @@ defmodule Explorer.PolarsBackend.DataFrame do
       column_name
       |> series_from_list!(values, dtype)
       |> then(fn series ->
-        if not is_nil(dtype) and series.dtype != dtype do
+        if not is_nil(dtype) and not Explorer.Shared.dtype_equal?(series.dtype, dtype) do
           PolarsSeries.cast(series, dtype)
         else
           series
@@ -600,10 +600,11 @@ defmodule Explorer.PolarsBackend.DataFrame do
   end
 
   defp from_series_list(list) do
-    list = Enum.map(list, & &1.data)
+    polars_df = Shared.apply(:df_from_series, [Enum.map(list, & &1.data)])
+    names = Shared.apply(:df_names, [polars_df])
+    dtypes = Enum.map(list, & &1.dtype)
 
-    Shared.apply(:df_from_series, [list])
-    |> Shared.create_dataframe!()
+    Explorer.Backend.DataFrame.new(polars_df, names, dtypes)
   end
 
   defp to_column_name!(column_name) when is_binary(column_name), do: column_name

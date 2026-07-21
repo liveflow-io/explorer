@@ -449,6 +449,18 @@ defmodule Explorer.Query do
     {{:"::", meta, [left, right]}, vars}
   end
 
+  defp traverse(
+         {{:., dot_meta, [{var, _var_meta, context} = series, :dtype]}, call_meta, []},
+         vars,
+         %{known_vars: known_vars}
+       )
+       when Kernel.and(
+              Kernel.and(is_atom(var), is_atom(context)),
+              is_map_key(known_vars, {var, context})
+            ) do
+    {{{:., dot_meta, [Explorer.Series, :dtype]}, call_meta, [series]}, vars}
+  end
+
   defp traverse({:cond, _meta, [[do: clauses]]}, vars, state) do
     {clauses, vars} =
       Enum.map_reduce(clauses, vars, fn {:->, _, [[on_condition], on_true]}, vars ->

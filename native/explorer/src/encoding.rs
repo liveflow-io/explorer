@@ -573,6 +573,13 @@ fn generic_string_series_to_list<'b>(s: &Series, env: Env<'b>) -> Result<Term<'b
     ))
 }
 
+pub fn string_list_from_iter<'a, 'b>(
+    iterator: impl DoubleEndedIterator<Item = &'a str>,
+    env: Env<'b>,
+) -> Term<'b> {
+    unsafe_iterator_series_to_list!(env, iterator.map(|value| value.encode(env)))
+}
+
 fn generic_binary_series_to_list<'b>(
     resource: &ResourceArc<ExSeriesRef>,
     s: &Series,

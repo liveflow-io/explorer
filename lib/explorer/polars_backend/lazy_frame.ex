@@ -649,11 +649,22 @@ defmodule Explorer.PolarsBackend.LazyFrame do
   end
 
   defp cast_to_output_dtypes(%DF{} = df, %DF{} = out_df) do
-    DF.mutate_with(df, fn ldf ->
-      for {name, dtype} <- out_df.dtypes do
-        {name, Explorer.Series.cast(ldf[name], dtype)}
-      end
-    end)
+    casts =
+      for {name, dtype} <- out_df.dtypes,
+          not Explorer.Shared.dtype_equal?(df.dtypes[name], dtype),
+          do: {name, dtype}
+
+    case casts do
+      [] ->
+        df
+
+      casts ->
+        DF.mutate_with(df, fn ldf ->
+          for {name, dtype} <- casts do
+            {name, Explorer.Series.cast(ldf[name], dtype)}
+          end
+        end)
+    end
   end
 
   @impl true

@@ -58,9 +58,8 @@ defmodule Explorer.Series do
     * The atom `:decimal` as an alias for the `{:decimal, 38, 0}`.
 
   A series must consist of a single data type only. Series may have `nil` values in them.
-  The series `dtype` can be retrieved via the `dtype/1` function or directly accessed as
-  `series.dtype`. A `series.name` field is also available, but it is always `nil` unless
-  the series is retrieved from a dataframe.
+  The series `dtype` can be retrieved via the `dtype/1` function. A `series.name` field is
+  also available, but it is always `nil` unless the series is retrieved from a dataframe.
 
   Many functions only apply to certain dtypes. These functions may appear on distinct
   categories on the sidebar. Other functions may work on several datatypes, such as
@@ -201,8 +200,15 @@ defmodule Explorer.Series do
   @type integer_dtype_alias :: :integer | :u8 | :u16 | :u32 | :u64 | :s8 | :s16 | :s32 | :s64
   @type decimal_dtype_alias :: :decimal
 
-  @type t :: %Series{data: Explorer.Backend.Series.t(), dtype: dtype()}
-  @type lazy_t :: %Series{data: Explorer.Backend.LazySeries.t(), dtype: dtype()}
+  @typedoc false
+  @type internal_dtype ::
+          dtype()
+          | {:enum, Explorer.EnumDomain.t()}
+          | {:list, internal_dtype()}
+          | {:struct, [{String.t(), internal_dtype()}]}
+
+  @type t :: %Series{data: Explorer.Backend.Series.t(), dtype: internal_dtype()}
+  @type lazy_t :: %Series{data: Explorer.Backend.LazySeries.t(), dtype: internal_dtype()}
 
   @type non_finite :: :nan | :infinity | :neg_infinity
   @type inferable_scalar ::
@@ -1102,7 +1108,7 @@ defmodule Explorer.Series do
   @spec cast(series :: Series.t(), dtype :: dtype() | dtype_alias()) :: Series.t()
   def cast(%Series{dtype: original_dtype} = series, dtype) do
     if normalised = Shared.normalise_dtype(dtype) do
-      if normalised == original_dtype do
+      if Shared.dtype_equal?(normalised, original_dtype) do
         series
       else
         apply_series(series, :cast, [normalised])
@@ -1229,7 +1235,7 @@ defmodule Explorer.Series do
   """
   @doc type: :introspection
   @spec dtype(series :: Series.t()) :: dtype()
-  def dtype(%Series{dtype: dtype}), do: dtype
+  def dtype(%Series{dtype: dtype}), do: Shared.external_dtype(dtype)
 
   @doc """
   Returns the number of elements in the series.
@@ -1566,7 +1572,7 @@ defmodule Explorer.Series do
       K.and(is_numeric_dtype(on_true_dtype), is_numeric_dtype(on_false_dtype)) ->
         apply_series_list(:select, [predicate, on_true, on_false])
 
-      on_true_dtype == on_false_dtype ->
+      Shared.dtype_equal?(on_true_dtype, on_false_dtype) ->
         apply_series_list(:select, [predicate, on_true, on_false])
 
       true ->
@@ -2307,27 +2313,20 @@ defmodule Explorer.Series do
   @doc type: :shape
   @spec concat([Series.t()]) :: Series.t()
   def concat([%Series{} | _t] = series) do
-    dtypes = series |> Enum.map(& &1.dtype) |> Enum.uniq()
+    dtype =
+      Enum.reduce(series, :null, fn %{dtype: dtype}, acc ->
+        Shared.merge_dtype(acc, dtype) ||
+          raise ArgumentError,
+                "cannot concatenate series with mismatched dtypes: " <>
+                  "#{inspect(Enum.map(series, & &1.dtype) |> Enum.uniq())}. " <>
+                  "First cast the series to the desired dtype."
+      end)
 
     series =
-      case List.delete(dtypes, :null) do
-        [] ->
-          series
-
-        [dtype] ->
-          if Enum.member?(dtypes, :null), do: Enum.map(series, &cast(&1, dtype)), else: series
-
-        dtypes ->
-          dtype =
-            Enum.reduce(dtypes, fn left, right ->
-              Shared.merge_numeric_dtype(left, right) ||
-                raise ArgumentError,
-                      "cannot concatenate series with mismatched dtypes: #{inspect(dtypes)}. " <>
-                        "First cast the series to the desired dtype."
-            end)
-
-          Enum.map(series, &cast(&1, dtype))
-      end
+      Enum.map(series, fn
+        %{dtype: series_dtype} = series ->
+          if Shared.dtype_equal?(series_dtype, dtype), do: series, else: cast(series, dtype)
+      end)
 
     apply_series_varargs(:concat, series)
   end
@@ -4737,13 +4736,13 @@ defmodule Explorer.Series do
       false
   """
   @doc type: :element_wise
-  def all_equal(%Series{dtype: dtype} = left, %Series{dtype: dtype} = right),
-    do: apply_series_list(:all_equal, [left, right])
-
-  def all_equal(%Series{dtype: left_dtype}, %Series{dtype: right_dtype})
-      when left_dtype !=
-             right_dtype,
-      do: false
+  def all_equal(%Series{dtype: left_dtype} = left, %Series{dtype: right_dtype} = right) do
+    if Shared.dtype_equal?(left_dtype, right_dtype) do
+      apply_series_list(:all_equal, [left, right])
+    else
+      false
+    end
+  end
 
   @doc """
   Negate the elements of a boolean series.
@@ -7115,12 +7114,15 @@ defmodule Explorer.Series do
   defp dtype_or_inspect(value), do: inspect(value)
 
   defp check_dtypes_for_coalesce!(%Series{} = s1, %Series{} = s2) do
-    # TODO: consider the unsigned types here.
-    case {s1.dtype, s2.dtype} do
-      {dtype, dtype} -> :ok
-      {{:s, _}, {:f, _}} -> :ok
-      {{:f, _}, {:s, _}} -> :ok
-      {left, right} -> dtype_mismatch_error("coalesce/2", left, right)
+    if Shared.dtype_equal?(s1.dtype, s2.dtype) do
+      :ok
+    else
+      # TODO: consider the unsigned types here.
+      case {s1.dtype, s2.dtype} do
+        {{:s, _}, {:f, _}} -> :ok
+        {{:f, _}, {:s, _}} -> :ok
+        {left, right} -> dtype_mismatch_error("coalesce/2", left, right)
+      end
     end
   end
 

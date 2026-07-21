@@ -57,7 +57,7 @@ defmodule Explorer.PolarsBackend.Shared do
             end
 
           if Enum.sort(out_df.names) != Enum.sort(check_df.names) or
-               out_df.dtypes != check_df.dtypes do
+               not Explorer.Shared.dtype_map_equal?(out_df.dtypes, check_df.dtypes) do
             raise """
             DataFrame mismatch.
 

@@ -23,6 +23,10 @@ defmodule Explorer.PolarsBackend.Native do
 
   defstruct [:inner]
 
+  def enum_domain_new(_categories), do: err()
+  def enum_domain_categories(_domain), do: err()
+  def enum_domain_equal(_left, _right), do: err()
+
   def df_from_arrow_stream_pointer(_stream_ptr), do: err()
 
   def df_sort_by(
@@ -366,7 +370,7 @@ defmodule Explorer.PolarsBackend.Native do
   def s_from_list_str(_name, _val), do: err()
   def s_from_list_binary(_name, _val), do: err()
   def s_from_list_categories(_name, _val), do: err()
-  def s_from_list_enum(_name, _val, _categories), do: err()
+  def s_from_list_enum(_name, _val, _domain), do: err()
   def s_from_list_decimal(_name, _val, _precision, _scale), do: err()
   def s_from_list_of_series(_name, _val, _dtype), do: err()
   def s_from_list_of_series_as_structs(_name, _val, _dtype), do: err()
