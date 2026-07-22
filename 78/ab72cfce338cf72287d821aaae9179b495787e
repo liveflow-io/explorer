@@ -1,0 +1,131 @@
+lib/explorer/polars_backend/data_frame.ex
+  s_49b95cfc3b76cd::t_ac900cdad3d21d 577,603-605,607
+lib/explorer/polars_backend/shared.ex
+  s_49b95cfc3b76cd::t_7adbae8d9b9e90 60
+lib/explorer/query.ex
+  s_49b95cfc3b76cd::t_052e95bf00e33d 452-463
+lib/explorer/backend/data_frame.ex
+  s_49b95cfc3b76cd::t_e22b308d6f6c94 22
+  s_49b95cfc3b76cd::t_66e552ef3c2b73 315,344
+lib/explorer/data_frame.ex
+  s_49b95cfc3b76cd::t_109e16d6bf58d5 266
+  s_49b95cfc3b76cd::t_e84be858cdd43d 2157
+lib/explorer/shared.ex
+  s_49b95cfc3b76cd::t_d6ada287b703d3 200-211
+  s_49b95cfc3b76cd::t_470501748c9f05 333
+  s_49b95cfc3b76cd::t_26db36e689d38d 89
+  s_49b95cfc3b76cd::t_68ff4b9f2abde8 133,135-137,139,141,144,146-177
+  s_49b95cfc3b76cd::t_d3ebe54f269987 186,189-198
+  s_49b95cfc3b76cd::t_7766d51c22c753 7-8,88,132,134,142,145,178-185,187-188,199,481-488
+  s_49b95cfc3b76cd::t_f4bc0bfb34738e 91-93
+  s_49b95cfc3b76cd::t_4402435bc42715 138,140,143
+native/explorer/src/datatypes/ex_dtypes.rs
+  s_49b95cfc3b76cd::t_f19a243d20c94a 1,46,80-82,145-147
+test/explorer/enum_domain_test.exs
+  s_49b95cfc3b76cd::t_11e84ebe0c03a1 28-33,64-74
+  s_49b95cfc3b76cd::t_35297df368f91a 1-3,5-27,34-42,53-57,60-63,75-83,88-89,98-100,103,105,109-121,151-154,156-161,163-177,179-182,193
+  s_49b95cfc3b76cd::t_81390b5ec295cc 178
+  s_49b95cfc3b76cd::t_d0a31a7f857307 183-192
+  s_49b95cfc3b76cd::t_479b1db4eca31a 4,101-102,104,106-108,155,162
+  s_49b95cfc3b76cd::t_936890a8a44173 90-97
+  s_49b95cfc3b76cd::t_aa73bfa53d321e 58-59
+  s_49b95cfc3b76cd::t_91c4a0f385dace 84-87
+  s_49b95cfc3b76cd::t_142499af8b21f8 136-145,149-150
+  s_49b95cfc3b76cd::t_fd591eb0e2f95d 146
+  s_49b95cfc3b76cd::t_e9648ec6e74421 122-135
+  s_49b95cfc3b76cd::t_0b0be106ce6917 147-148
+  s_49b95cfc3b76cd::t_7f4487ecbda106 43-52
+lib/explorer/backend/lazy_series.ex
+  s_49b95cfc3b76cd::t_a91e49051022c1 1032
+  s_49b95cfc3b76cd::t_3da1992587eb92 14-16,429,433
+native/explorer/src/encoding.rs
+  s_49b95cfc3b76cd::t_be99dcfb52b187 576-582
+lib/explorer/series.ex
+  s_49b95cfc3b76cd::t_33c78c506e2173 1238,1575,4739-4745
+  s_49b95cfc3b76cd::t_b5c67ac44c9576 61-62
+  s_aff3ecca750791::t_c3e6f06807299d 2316-2322,2326-2328
+  s_49b95cfc3b76cd::t_b6dab49ad921c4 2323,2329
+  s_49b95cfc3b76cd::t_1b8332295b148a 7117-7125
+  s_49b95cfc3b76cd::t_9d46bed5e7ee3c 1111
+  s_49b95cfc3b76cd::t_d32ff29efc6222 203-211
+test/explorer/data_frame/lazy_test.exs
+  s_49b95cfc3b76cd::t_c25ff2ecdd4ce0 1029
+native/explorer/src/datatypes.rs
+  s_49b95cfc3b76cd::t_d0d81155c2b0b9 126-130
+  s_a1713d47314b88::t_893a074e9035e9 148
+  s_49b95cfc3b76cd::t_a1f22eb19caaa7 104-105
+  s_49b95cfc3b76cd::t_bb422059eee411 4,12,155-156
+  s_49b95cfc3b76cd::t_632d96e62fd0a9 73,89,133,137,150
+  s_49b95cfc3b76cd::t_8ff564987832a9 13,15,17,64-67,131-132,134,136,145-147,149
+  s_49b95cfc3b76cd::t_ebe00cc73c81d8 69-70,77,86,94-95,135
+  s_49b95cfc3b76cd::t_70faf054eb1460 163
+  s_49b95cfc3b76cd::t_7efbbc15a8e6a7 59-63,96-103,115-125,152-154,157-162
+  s_49b95cfc3b76cd::t_0f4dc616df535f 106-114
+  s_49b95cfc3b76cd::t_e383233b98134d 71-72,74-76,79-85,87-88,90-93,138-144,151
+  s_49b95cfc3b76cd::t_8d3aba3be27467 68,78
+lib/explorer/polars_backend/lazy_frame.ex
+  s_49b95cfc3b76cd::t_4cbd0913219c58 652-667
+lib/explorer/enum_domain.ex
+  s_49b95cfc3b76cd::t_ed0054a07baacd 9-14
+  s_49b95cfc3b76cd::t_bdc5e4d404e852 16
+  s_49b95cfc3b76cd::t_d0ec5837739031 1-8,15,17,25-39
+  s_49b95cfc3b76cd::t_62c336c8352d70 18-21,23-24
+  s_49b95cfc3b76cd::t_8d3aba3be27467 22
+lib/explorer/backend/series.ex
+  s_49b95cfc3b76cd::t_aa24082e363ef2 372
+  s_49b95cfc3b76cd::t_7f53ba9eb229aa 11
+bench/enum_dtype.exs
+  s_49b95cfc3b76cd::t_5317539bff5e6b 27-28,31-33,35-36,41,60,131,137-139,141-146,150,152-154
+  s_49b95cfc3b76cd::t_744cd0780059f0 37-40
+  s_49b95cfc3b76cd::t_43c888e6498cc4 78-81,114
+  s_49b95cfc3b76cd::t_81f58b89a56bf4 104
+  s_49b95cfc3b76cd::t_b96bff57d8ca86 1-26,29-30,34,42-59,63-77,82-103,105-113,115-130,132-136,140,147-149,151,155-169,173-204
+  s_49b95cfc3b76cd::t_943fd810f5de37 61-62,170-172
+native/explorer/src/series/from_list.rs
+  s_49b95cfc3b76cd::t_d191580fa24db1 4,428,433
+  s_49b95cfc3b76cd::t_501bf706f598ab 430
+lib/explorer/polars_backend/native.ex
+  s_49b95cfc3b76cd::t_4afbb5d616be96 26-29,373
+test/explorer/query_test.exs
+  s_49b95cfc3b76cd::t_95ae649a0f9e01 163-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "78ab72cfce338cf72287d821aaae9179b495787e",
+  "prompts": {},
+  "sessions": {
+    "s_49b95cfc3b76cd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "180fc69a-7478-4c51-9289-3389bbf44e91",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": null
+    },
+    "s_a1713d47314b88": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "71b3b01a-25fb-479e-b3cc-959d3ff76331",
+        "model": "gpt-5.6-sol-high"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    },
+    "s_aff3ecca750791": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ef840658-881f-45d4-b727-7cb1bef80ad8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    },
+    "s_df41e6a7668621": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "41edf763-04b0-4bd5-8a38-6491302d3cd4",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}

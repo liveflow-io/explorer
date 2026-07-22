@@ -1,0 +1,28 @@
+README.md
+  s_4c3990569a7493::t_a3f47cf234198b 69,78,86
+mix.exs
+  s_4c3990569a7493::t_2eb9a05743bef0 5
+CHANGELOG.md
+  s_4c3990569a7493::t_9ffa6f69ffde06 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "7f82597dc86ec962bb9a3357c2e8cb8eaa404dd0",
+  "prompts": {},
+  "humans": {
+    "h_a788fab786425d": {
+      "author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  },
+  "sessions": {
+    "s_4c3990569a7493": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "807f29de-415f-4711-a165-bdea7c27906d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
