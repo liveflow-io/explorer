@@ -1,0 +1,19 @@
+checksum-Elixir.Explorer.PolarsBackend.Native.exs
+  s_df41e6a7668621::t_520559546763a4 3,5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "790f517364c8c3a9c3aae88d5229d594c3aa5422",
+  "prompts": {},
+  "sessions": {
+    "s_df41e6a7668621": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "41edf763-04b0-4bd5-8a38-6491302d3cd4",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Evan O'Brien <evan@liveflow.io>"
+    }
+  }
+}
