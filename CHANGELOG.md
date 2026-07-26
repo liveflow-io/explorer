@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Series.select/3` and `Series.coalesce/2` now accept an enum alongside `:string`
+  instead of requiring identical dtypes. The strings are encoded into the enum, so the
+  result keeps the compact dtype and enum columns no longer have to be pre-cast. A
+  string outside the domain raises rather than silently widening the column.
+- `Explorer.EnumDomain` is enumerable, so the domain held in `series.dtype` can be used
+  wherever the category list returned by `Series.dtype/1` would be.
+
+### Fixed
+
+- `Series.fill_missing/2` no longer panics the NIF on enum and `:category` series. The
+  fill happens over the physical representation, so the dtype is kept and the column is
+  never materialized as strings. Values outside an enum's domain raise an
+  `ArgumentError`.
+- Enum dtypes are now compared by their categories in dtype checks, so a dtype read back
+  through `Series.dtype/1` can be used to build a series comparable to its source.
+- Membership no longer strict-casts its values inside lazy queries. A value outside the
+  domain fails to match instead of failing the query, matching the eager behaviour. This
+  covers `Series.in/2`, `Series.member?/2` and the `not in` query operator.
+- Dtype error messages now show the enum categories instead of the internal domain struct.
+
 ## [v0.13.1] - 2026-07-22
 
 ### Added

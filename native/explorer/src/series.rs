@@ -582,31 +582,60 @@ fn f64_to_f32(float64: f64) -> f32 {
     float32
 }
 
+// Filling a string series requires a detour through binary, because Polars cannot
+// fill UTF8 series directly.
+fn fill_string_missing_with_bin(series: &Series, binary: &Binary) -> Result<Series, ExplorerError> {
+    if std::str::from_utf8(binary).is_err() {
+        return Err(ExplorerError::Other("cannot cast to string".into()));
+    }
+
+    let filled = unsafe {
+        series
+            .cast_unchecked(&DataType::Binary)?
+            .binary()?
+            .fill_null_with_values(binary)?
+            .cast_unchecked(&DataType::String)?
+    };
+
+    Ok(filled)
+}
+
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_fill_missing_with_bin(
     series: ExSeries,
     binary: Binary,
 ) -> Result<ExSeries, ExplorerError> {
     let s = match series.dtype() {
-        DataType::String => {
-            if let Ok(_string) = std::str::from_utf8(&binary) {
-                // This casting is necessary just because it's not possible to fill UTF8 series.
-                unsafe {
-                    series
-                        .cast_unchecked(&DataType::Binary)?
-                        .binary()?
-                        .fill_null_with_values(&binary)?
-                        .cast_unchecked(&DataType::String)?
-                }
-            } else {
-                return Err(ExplorerError::Other("cannot cast to string".into()));
-            }
-        }
+        DataType::String => fill_string_missing_with_bin(&series, &binary)?,
         DataType::Binary => series
             .binary()?
             .fill_null_with_values(&binary)?
             .into_series(),
-        dt => panic!("fill_missing/2 not implemented for {dt:?}"),
+        // Encode the value once and fill over the physical representation, so that a
+        // wide series is never materialized as strings. The cast is strict because the
+        // caller has already checked the value against the domain.
+        dtype @ (DataType::Enum(_, _) | DataType::Categorical(_, _)) => {
+            let Ok(value) = std::str::from_utf8(&binary) else {
+                return Err(ExplorerError::Other("cannot cast to string".into()));
+            };
+            let name = series.name().clone();
+            let fill = lit(value).strict_cast(dtype.clone());
+
+            series
+                .clone_inner()
+                .into_frame()
+                .lazy()
+                .select([col(name.clone()).fill_null(fill)])
+                .collect()?
+                .column(&name)?
+                .as_materialized_series()
+                .clone()
+        }
+        dtype => {
+            return Err(ExplorerError::Other(format!(
+                "fill_missing/2 is not implemented for dtype {dtype}"
+            )))
+        }
     };
     Ok(ExSeries::new(s))
 }
@@ -1939,13 +1968,13 @@ fn s_member(
     inner_dtype: ExSeriesDtype,
 ) -> Result<ExSeries, ExplorerError> {
     let inner_dtype = DataType::try_from(&inner_dtype)?;
-    let value_expr = value.lit_with_matching_precision(&inner_dtype);
+    let contains = value.list_contains(col(s.name().clone()), &inner_dtype);
 
     let s2 = s
         .clone_inner()
         .into_frame()
         .lazy()
-        .select([col(s.name().clone()).list().contains(value_expr, false)])
+        .select([contains.alias(s.name().clone())])
         .collect()?
         .column(s.name())?
         .as_materialized_series()

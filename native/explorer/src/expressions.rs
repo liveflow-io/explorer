@@ -107,6 +107,16 @@ pub fn expr_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
     }
 }
 
+/// Casts without the strictness `expr_cast/2` applies to enums: values outside the
+/// domain become null rather than failing the query.
+#[rustler::nif]
+pub fn expr_lenient_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
+    let expr = data.clone_inner();
+    let to_dtype = DataType::try_from(&to_dtype).expect("dtype is not valid");
+
+    ExExpr::new(expr.cast(to_dtype))
+}
+
 #[rustler::nif]
 pub fn expr_column(name: &str) -> ExExpr {
     let expr = col(name);
@@ -1165,10 +1175,7 @@ pub fn expr_member(expr: ExExpr, value: ExValidValue, inner_dtype: ExSeriesDtype
     let expr = expr.clone_inner();
     let inner_dtype = DataType::try_from(&inner_dtype).unwrap();
 
-    ExExpr::new(
-        expr.list()
-            .contains(value.lit_with_matching_precision(&inner_dtype), false),
-    )
+    ExExpr::new(value.list_contains(expr, &inner_dtype))
 }
 
 #[rustler::nif]

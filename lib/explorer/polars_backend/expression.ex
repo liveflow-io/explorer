@@ -170,6 +170,7 @@ defmodule Explorer.PolarsBackend.Expression do
     divide: 2,
     multiply: 2,
     cast: 2,
+    lenient_cast: 2,
     fill_missing_with_strategy: 2,
     from_list: 2,
     from_binary: 2,
@@ -248,6 +249,11 @@ defmodule Explorer.PolarsBackend.Expression do
   def to_expr(%LazySeries{op: :cast, args: [lazy_series, dtype]}) do
     lazy_series_expr = to_expr(lazy_series)
     Native.expr_cast(lazy_series_expr, dtype)
+  end
+
+  def to_expr(%LazySeries{op: :lenient_cast, args: [lazy_series, dtype]}) do
+    lazy_series_expr = to_expr(lazy_series)
+    Native.expr_lenient_cast(lazy_series_expr, dtype)
   end
 
   def to_expr(%LazySeries{op: :fill_missing_with_strategy, args: [lazy_series, strategy]}) do

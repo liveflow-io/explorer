@@ -22,6 +22,29 @@ defmodule Explorer.EnumDomain do
       do: Native.enum_domain_equal(left, right)
 
   def equal?(%__MODULE__{}, %__MODULE__{}), do: false
+
+  @doc """
+  Checks whether `value` is one of the domain's categories.
+
+  This is a hash lookup on the native domain, so it does not materialize the
+  category list.
+  """
+  def member?(%__MODULE__{} = domain, value) when is_binary(value),
+    do: Native.enum_domain_member(domain, value)
+
+  def member?(%__MODULE__{}, _value), do: false
+end
+
+# A domain stands in for its category list, so that code reaching into
+# `series.dtype` can treat it like the list returned by `Explorer.Series.dtype/1`.
+defimpl Enumerable, for: Explorer.EnumDomain do
+  alias Explorer.EnumDomain
+
+  def count(domain), do: {:ok, domain.size}
+  def member?(domain, value), do: {:ok, EnumDomain.member?(domain, value)}
+  def slice(_domain), do: {:error, __MODULE__}
+
+  def reduce(domain, acc, fun), do: Enumerable.reduce(EnumDomain.categories(domain), acc, fun)
 end
 
 defimpl Inspect, for: Explorer.EnumDomain do

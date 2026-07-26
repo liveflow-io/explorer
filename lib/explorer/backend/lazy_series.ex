@@ -56,6 +56,7 @@ defmodule Explorer.Backend.LazySeries do
     concat: 1,
     coalesce: 2,
     cast: 2,
+    lenient_cast: 2,
     select: 3,
     abs: 1,
     strptime: 2,
@@ -442,7 +443,7 @@ defmodule Explorer.Backend.LazySeries do
   end
 
   # These are also comparison operations, but they only accept `Series`.
-  for op <- [:binary_and, :binary_or, :binary_in] do
+  for op <- [:binary_and, :binary_or] do
     @impl true
     def unquote(op)(%Series{} = left, %Series{} = right) do
       args = [series_or_lazy_series!(left), series_or_lazy_series!(right)]
@@ -451,6 +452,24 @@ defmodule Explorer.Backend.LazySeries do
       Backend.Series.new(data, :boolean)
     end
   end
+
+  @impl true
+  def binary_in(%Series{} = left, %Series{} = right) do
+    args = [series_or_lazy_series!(left), values_to_look_for(right, left.dtype)]
+    data = new(:binary_in, args, :boolean, aggregations?(args))
+
+    Backend.Series.new(data, :boolean)
+  end
+
+  # The eager backend hands the values straight to Polars, which matches them against
+  # the domain. Inside a plan Polars instead strict-casts them, which fails the whole
+  # query on an unknown value, so we cast them ourselves: values outside the domain
+  # become null and simply never match.
+  defp values_to_look_for(%Series{dtype: :string} = right, {:enum, _} = dtype),
+    do: new(:lenient_cast, [series_or_lazy_series!(right), dtype], dtype)
+
+  defp values_to_look_for(%Series{} = right, _left_dtype),
+    do: series_or_lazy_series!(right)
 
   for op <- @basic_arithmetic_operations do
     @impl true

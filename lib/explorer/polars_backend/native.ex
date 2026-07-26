@@ -26,6 +26,7 @@ defmodule Explorer.PolarsBackend.Native do
   def enum_domain_new(_categories), do: err()
   def enum_domain_categories(_domain), do: err()
   def enum_domain_equal(_left, _right), do: err()
+  def enum_domain_member(_domain, _value), do: err()
 
   def df_from_arrow_stream_pointer(_stream_ptr), do: err()
 

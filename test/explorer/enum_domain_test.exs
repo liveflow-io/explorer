@@ -190,4 +190,244 @@ defmodule Explorer.EnumDomainTest do
 
     assert dataframe_size.(10_000) == dataframe_size.(10)
   end
+
+  describe "domains as category collections" do
+    test "enumerates the categories held by the internal dtype" do
+      {:enum, domain} = Series.from_list(["open"], dtype: @dtype).dtype
+
+      assert Enum.to_list(domain) == @categories
+      assert Enum.count(domain) == 3
+      assert Enum.map(domain, &String.upcase/1) == ["OPEN", "PENDING", "CLOSED"]
+    end
+
+    test "answers membership without materializing the categories" do
+      {:enum, domain} = Series.from_list(["open"], dtype: @dtype).dtype
+
+      assert "pending" in domain
+      refute "missing" in domain
+      refute :pending in domain
+    end
+
+    test "reports categories rather than the domain struct in dtype errors" do
+      series = Series.from_list(["open"], dtype: @dtype)
+
+      assert_raise ArgumentError,
+                   ~r/mismatched dtypes: \{:enum, \["open", "pending", "closed"\]\} and \{:s, 64\}/,
+                   fn -> Series.coalesce(series, Series.from_list([1])) end
+    end
+  end
+
+  describe "dtypes read back through Series.dtype/1" do
+    test "build series that compare against the series they came from" do
+      series = Series.from_list(["open", "closed"], dtype: @dtype)
+      other = Series.from_list(["open", "pending"], dtype: Series.dtype(series))
+
+      assert Series.to_list(Series.equal(series, other)) == [true, false]
+      assert Series.to_list(Series.not_equal(series, other)) == [false, true]
+      assert Series.to_list(Series.in(series, other)) == [true, false]
+    end
+
+    test "round-trip through nested dtypes" do
+      series = Series.from_list([["open"], ["closed"]], dtype: {:list, @dtype})
+      other = Series.from_list([["open"], ["pending"]], dtype: Series.dtype(series))
+
+      assert Series.to_list(Series.equal(series, other)) == [true, false]
+    end
+
+    test "still reject genuinely different domains" do
+      series = Series.from_list(["open"], dtype: @dtype)
+      other = Series.from_list(["a"], dtype: {:enum, ["a"]})
+
+      assert_raise ArgumentError, ~r/mismatched dtypes/, fn -> Series.equal(series, other) end
+    end
+  end
+
+  describe "fill_missing/2" do
+    test "fills with a value from the domain and keeps the dtype" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+      filled = Series.fill_missing(series, "closed")
+
+      assert Series.dtype(filled) == @dtype
+      assert Series.to_list(filled) == ["open", "closed"]
+    end
+
+    test "raises naming the value and the domain when it is outside the categories" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+
+      assert_raise ArgumentError,
+                   ~s(cannot fill missing values with "archived" because it is not one of the ) <>
+                     ~s(categories of {:enum, ["open", "pending", "closed"]}),
+                   fn -> Series.fill_missing(series, "archived") end
+    end
+
+    test "supports the ordered strategies" do
+      series = Series.from_list(["pending", nil, "open"], dtype: @dtype)
+
+      for {strategy, expected} <- [
+            forward: ["pending", "pending", "open"],
+            backward: ["pending", "open", "open"],
+            min: ["pending", "open", "open"],
+            max: ["pending", "pending", "open"]
+          ] do
+        filled = Series.fill_missing(series, strategy)
+
+        assert Series.dtype(filled) == @dtype
+        assert Series.to_list(filled) == expected
+      end
+    end
+
+    test "supports strategies on lists of enums" do
+      series = Series.from_list([["open"], nil, ["closed"]], dtype: {:list, @dtype})
+      filled = Series.fill_missing(series, :forward)
+
+      assert Series.dtype(filled) == {:list, @dtype}
+      assert Series.to_list(filled) == [["open"], ["open"], ["closed"]]
+    end
+
+    test "fills inside a query" do
+      df = DF.new(status: Series.from_list(["open", nil], dtype: @dtype))
+
+      out =
+        DF.mutate_with(df, fn ldf -> [status: Series.fill_missing(ldf["status"], "closed")] end)
+
+      assert DF.dtypes(out) == %{"status" => @dtype}
+      assert DF.to_columns(out, atom_keys: true) == %{status: ["open", "closed"]}
+    end
+  end
+
+  describe "supertyping enums with strings" do
+    test "select/3 keeps the enum when the string side fits the domain" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+      selected = Series.select(Series.is_nil(series), "closed", series)
+
+      assert Series.dtype(selected) == @dtype
+      assert Series.to_list(selected) == ["open", "closed"]
+    end
+
+    test "select/3 raises rather than widening when the value is outside the domain" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+
+      assert_raise RuntimeError, ~r/archived/, fn ->
+        Series.select(Series.is_nil(series), "archived", series)
+      end
+    end
+
+    test "select/3 supertypes with the enum on either branch" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+      predicate = Series.is_nil(series)
+      strings = Series.from_list(["closed", "closed"])
+
+      assert Series.dtype(Series.select(predicate, strings, series)) == @dtype
+      assert Series.dtype(Series.select(predicate, series, strings)) == @dtype
+    end
+
+    test "coalesce/2 keeps the enum when the string side fits the domain" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+      coalesced = Series.coalesce(series, Series.from_list(["pending", "closed"]))
+
+      assert Series.dtype(coalesced) == @dtype
+      assert Series.to_list(coalesced) == ["open", "closed"]
+    end
+
+    test "coalesce/2 raises rather than widening when the string side leaves the domain" do
+      series = Series.from_list(["open", nil], dtype: @dtype)
+
+      assert_raise RuntimeError, ~r/archived/, fn ->
+        Series.coalesce(series, Series.from_list(["pending", "archived"]))
+      end
+    end
+
+    test "supertypes a string scalar inside a query" do
+      df = DF.new(status: Series.from_list(["open", nil], dtype: @dtype))
+
+      out =
+        DF.mutate_with(df, fn ldf ->
+          [status: Series.select(Series.is_nil(ldf["status"]), "closed", ldf["status"])]
+        end)
+
+      assert DF.dtypes(out) == %{"status" => @dtype}
+      assert DF.to_columns(out, atom_keys: true) == %{status: ["open", "closed"]}
+    end
+
+    test "keeps the enum when the string side is a lazy column" do
+      df =
+        DF.new(
+          status: Series.from_list(["open", nil], dtype: @dtype),
+          fallback: Series.from_list([nil, "closed"])
+        )
+
+      out =
+        DF.mutate_with(df, fn ldf -> [result: Series.coalesce(ldf["status"], ldf["fallback"])] end)
+
+      assert DF.dtypes(out)["result"] == @dtype
+      assert DF.to_columns(out, atom_keys: true).result == ["open", "closed"]
+    end
+
+    test "raises when a lazy string column leaves the domain" do
+      df =
+        DF.new(
+          status: Series.from_list(["open", nil], dtype: @dtype),
+          fallback: Series.from_list([nil, "archived"])
+        )
+
+      assert_raise RuntimeError, ~r/archived/, fn ->
+        DF.mutate_with(df, fn ldf -> [result: Series.coalesce(ldf["status"], ldf["fallback"])] end)
+      end
+    end
+
+    test "still raises for dtypes that have no supertype" do
+      series = Series.from_list(["open"], dtype: @dtype)
+
+      assert_raise ArgumentError, ~r/mismatched dtypes/, fn ->
+        Series.select(Series.from_list([true]), series, Series.from_list([1]))
+      end
+    end
+  end
+
+  describe "membership with values outside the domain" do
+    test "does not match instead of failing an eager series" do
+      series = Series.from_list(["open", "closed"], dtype: @dtype)
+
+      assert Series.to_list(Series.in(series, Series.from_list(["archived"]))) == [false, false]
+      assert Series.to_list(Series.in(series, ["closed", "archived"])) == [false, true]
+    end
+
+    test "does not match instead of failing a query" do
+      df = DF.new(status: Series.from_list(["open", "closed"], dtype: @dtype))
+
+      unknown =
+        DF.filter_with(df, fn ldf -> Series.in(ldf["status"], Series.from_list(["archived"])) end)
+
+      mixed =
+        DF.filter_with(df, fn ldf ->
+          Series.in(ldf["status"], Series.from_list(["closed", "archived"]))
+        end)
+
+      assert DF.to_columns(unknown, atom_keys: true) == %{status: []}
+      assert DF.to_columns(mixed, atom_keys: true) == %{status: ["closed"]}
+    end
+
+    test "does not match through the `not in` operator" do
+      df = DF.new(status: Series.from_list(["open", "closed"], dtype: @dtype))
+      unknown = Series.from_list(["archived"])
+
+      assert DF.to_columns(DF.filter(df, status not in ^unknown), atom_keys: true) == %{
+               status: ["open", "closed"]
+             }
+    end
+
+    test "does not match a list of enums, keeping nils" do
+      series = Series.from_list([["open"], nil, []], dtype: {:list, @dtype})
+
+      assert Series.to_list(Series.member?(series, "archived")) == [false, nil, false]
+      assert Series.to_list(Series.member?(series, "open")) == [true, nil, false]
+    end
+
+    test "does not match a list of enums inside a query" do
+      df = DF.new(status: Series.from_list([["open"], nil, []], dtype: {:list, @dtype}))
+      out = DF.mutate_with(df, fn ldf -> [found: Series.member?(ldf["status"], "archived")] end)
+
+      assert DF.to_columns(out, atom_keys: true).found == [false, nil, false]
+    end
+  end
 end

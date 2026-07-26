@@ -141,6 +141,7 @@ defmodule Explorer.Series do
   alias __MODULE__, as: Series
   alias Kernel, as: K
   alias Explorer.Duration
+  alias Explorer.EnumDomain
   alias Explorer.Shared
 
   @naive_datetime_dtypes Explorer.Shared.naive_datetime_types()
@@ -1551,6 +1552,9 @@ defmodule Explorer.Series do
   It is possible to mix numeric series in the `on_true` and `on_false`,
   and the resultant series will have the dtype of the greater side.
   For example, `:u8` and `:s16` is going to result in `:s16` series.
+
+  An enum can also be mixed with `:string`. The strings are encoded into the enum,
+  which keeps the result compact, so they must all belong to its categories.
   """
   @doc type: :element_wise
   @spec select(
@@ -1574,6 +1578,9 @@ defmodule Explorer.Series do
 
       Shared.dtype_equal?(on_true_dtype, on_false_dtype) ->
         apply_series_list(:select, [predicate, on_true, on_false])
+
+      branches = cast_for_enum_and_string(on_true, on_false) ->
+        apply_series_list(:select, [predicate | branches])
 
       true ->
         dtype_mismatch_error("select/3", on_true_dtype, on_false_dtype)
@@ -2365,6 +2372,9 @@ defmodule Explorer.Series do
 
   `coalesce(s1, s2)` is equivalent to `coalesce([s1, s2])`.
 
+  An enum can be coalesced with `:string`. The strings are encoded into the enum,
+  which keeps the result compact, so they must all belong to its categories.
+
   ## Examples
 
       iex> s1 = Explorer.Series.from_list([1, nil, 3, nil])
@@ -2383,8 +2393,7 @@ defmodule Explorer.Series do
   @doc type: :element_wise
   @spec coalesce(s1 :: Series.t(), s2 :: Series.t()) :: Series.t()
   def coalesce(s1, s2) do
-    :ok = check_dtypes_for_coalesce!(s1, s2)
-    apply_series_list(:coalesce, [s1, s2])
+    apply_series_list(:coalesce, cast_for_coalesce!(s1, s2))
   end
 
   # Aggregation
@@ -4514,6 +4523,9 @@ defmodule Explorer.Series do
 
   The series sizes do not have to match.
 
+  When the left side is an enum, values outside its categories simply do not
+  match rather than raising.
+
   See `member?/2` if you want to check if a literal belongs to a list.
 
   ## Examples
@@ -4545,6 +4557,25 @@ defmodule Explorer.Series do
 
   def (%Series{data: %backend{}} = left) in right when is_list(right),
     do: left in backend.from_list(right, Shared.dtype_from_list!(right))
+
+  ## Enum and string supertyping
+
+  # Strings are encoded into the enum rather than the enum being widened to `:string`,
+  # so that the result keeps the compact dtype. The cast is the strict one, meaning a
+  # string outside the domain raises instead of silently widening the column.
+  defp cast_for_enum_and_string(
+         %Series{dtype: {:enum, _} = dtype} = enum,
+         %Series{dtype: :string} = str
+       ),
+       do: [enum, cast(str, dtype)]
+
+  defp cast_for_enum_and_string(
+         %Series{dtype: :string} = str,
+         %Series{dtype: {:enum, _} = dtype} = enum
+       ),
+       do: [cast(str, dtype), enum]
+
+  defp cast_for_enum_and_string(_left, _right), do: nil
 
   ## Comparable (a superset of ordered)
 
@@ -4629,15 +4660,14 @@ defmodule Explorer.Series do
   defp cast_for_ordered_operation(_left, _right),
     do: nil
 
-  defp valid_ordered_series?(dtype, dtype),
-    do: true
-
   defp valid_ordered_series?(left_dtype, right_dtype)
        when K.and(is_numeric_dtype(left_dtype), is_numeric_dtype(right_dtype)),
        do: true
 
-  defp valid_ordered_series?(_, _),
-    do: false
+  # Compared semantically rather than structurally, so that two enum dtypes over
+  # the same categories match even when they carry distinct domain resources.
+  defp valid_ordered_series?(left_dtype, right_dtype),
+    do: Shared.dtype_equal?(left_dtype, right_dtype)
 
   defp cast_to_ordered_series(dtype, value)
        when K.and(is_numeric_dtype(dtype), is_integer(value)),
@@ -5523,6 +5553,8 @@ defmodule Explorer.Series do
     * `:mean` - replace nil with the series mean
     * `:nan` (float only) - replace nil with `NaN`
 
+  Filling an enum series keeps its dtype, and the value must be one of its categories.
+
   ## Examples
 
       iex> s = Explorer.Series.from_list([1, 2, nil, 4])
@@ -5582,6 +5614,19 @@ defmodule Explorer.Series do
       iex> Explorer.Series.fill_missing(s, "foo")
       ** (ArgumentError) cannot invoke Explorer.Series.fill_missing/2 with mismatched dtypes: {:s, 64} and "foo"
 
+  As will values outside an enum's categories:
+
+      iex> s = Explorer.Series.from_list(["a", nil], dtype: {:enum, ["a", "b"]})
+      iex> Explorer.Series.fill_missing(s, "b")
+      #Explorer.Series<
+        Polars[2]
+        enum ["a", "b"]
+      >
+
+      iex> s = Explorer.Series.from_list(["a", nil], dtype: {:enum, ["a", "b"]})
+      iex> Explorer.Series.fill_missing(s, "c")
+      ** (ArgumentError) cannot fill missing values with "c" because it is not one of the categories of {:enum, ["a", "b"]}
+
   Floats in particular accept missing values to be set to NaN, Inf, and -Inf:
 
       iex> s = Explorer.Series.from_list([1.0, 2.0, nil, 4.0])
@@ -5632,6 +5677,16 @@ defmodule Explorer.Series do
   def fill_missing(%Series{} = series, strategy)
       when K.in(strategy, [:forward, :backward, :min, :max, :mean]),
       do: apply_series(series, :fill_missing_with_strategy, [strategy])
+
+  def fill_missing(%Series{dtype: {:enum, domain}} = series, value) when is_binary(value) do
+    if EnumDomain.member?(domain, value) do
+      apply_series(series, :fill_missing_with_value, [value])
+    else
+      raise ArgumentError,
+            "cannot fill missing values with #{inspect(value)} because it is not one of the " <>
+              "categories of #{inspect(Shared.external_dtype(series.dtype))}"
+    end
+  end
 
   def fill_missing(%Series{dtype: dtype} = series, value) do
     if cast_to_comparable_series(dtype, value) do
@@ -6866,6 +6921,9 @@ defmodule Explorer.Series do
   @doc """
   Checks for the presence of a value in a list series.
 
+  For a list of enums, a value outside the categories simply does not match
+  rather than raising.
+
   ## Examples
 
       iex> s = Series.from_list([[1], [1, 2]])
@@ -7110,19 +7168,26 @@ defmodule Explorer.Series do
     )
   end
 
-  defp dtype_or_inspect(%Series{dtype: dtype}), do: inspect(dtype)
-  defp dtype_or_inspect(value), do: inspect(value)
+  defp dtype_or_inspect(%Series{dtype: dtype}), do: dtype_or_inspect(dtype)
+  defp dtype_or_inspect(value), do: inspect(Shared.external_dtype(value))
 
-  defp check_dtypes_for_coalesce!(%Series{} = s1, %Series{} = s2) do
-    if Shared.dtype_equal?(s1.dtype, s2.dtype) do
-      :ok
-    else
+  defp cast_for_coalesce!(%Series{} = s1, %Series{} = s2) do
+    cond do
+      Shared.dtype_equal?(s1.dtype, s2.dtype) ->
+        [s1, s2]
+
       # TODO: consider the unsigned types here.
-      case {s1.dtype, s2.dtype} do
-        {{:s, _}, {:f, _}} -> :ok
-        {{:f, _}, {:s, _}} -> :ok
-        {left, right} -> dtype_mismatch_error("coalesce/2", left, right)
-      end
+      match?({{:s, _}, {:f, _}}, {s1.dtype, s2.dtype}) ->
+        [s1, s2]
+
+      match?({{:f, _}, {:s, _}}, {s1.dtype, s2.dtype}) ->
+        [s1, s2]
+
+      series = cast_for_enum_and_string(s1, s2) ->
+        series
+
+      true ->
+        dtype_mismatch_error("coalesce/2", s1.dtype, s2.dtype)
     end
   end
 
