@@ -1,7 +1,7 @@
-<h1><img src="explorer.png" alt="Explorer"></h1>
+<img src="/images/explorer.png" alt="Explorer">
 
 ![CI](https://github.com/elixir-nx/explorer/actions/workflows/ci.yml/badge.svg)
-[![Documentation](http://img.shields.io/badge/hex.pm-docs-green.svg?style=flat)](https://hexdocs.pm/explorer)
+[![Documentation](https://img.shields.io/badge/hex.pm-docs-green.svg?style=flat)](https://explorer.hexdocs.pm/)
 [![Package](https://img.shields.io/hexpm/v/explorer.svg)](https://hex.pm/packages/explorer)
 
 <!-- MDOC -->
@@ -66,7 +66,7 @@ Inside an Elixir script or [Livebook](https://livebook.dev):
 
 ```elixir
 Mix.install([
-  {:explorer, "~> 0.11.1"}
+  {:explorer, "~> 0.13.1"}
 ])
 ```
 
@@ -75,7 +75,7 @@ Or in the `mix.exs` file of your application:
 ```elixir
 def deps do
   [
-    {:explorer, "~> 0.11.1"}
+    {:explorer, "~> 0.13.1"}
   ]
 end
 ```
@@ -83,7 +83,7 @@ end
 Explorer will download a precompiled version of its native code upon installation. You can force a local build by setting the environment variable `EXPLORER_BUILD=1` and including `:rustler` as a dependency:
 
 ```elixir
-  {:explorer, "~> 0.11.1", system_env: %{"EXPLORER_BUILD" => "1"}},
+  {:explorer, "~> 0.13.1", system_env: %{"EXPLORER_BUILD" => "1"}},
   {:rustler, ">= 0.0.0"}
 ```
 
@@ -264,36 +264,16 @@ mix test --only cloud_integration
 
 ## Precompilation
 
-Explorer ships with the NIF code precompiled for the most popular architectures out there.
+Explorer ships with the NIF code precompiled for the supported production and development targets.
 We support the following:
 
 - `aarch64-apple-darwin` - MacOS running on ARM 64 bits CPUs.
-- `aarch64-unknown-linux-gnu` - Linux running on ARM 64 bits CPUs, compiled with GCC.
-- `aarch64-unknown-linux-musl` - Linux running on ARM 64 bits CPUs, compiled with Musl.
-- `x86_64-apple-darwin` - MacOS running on Intel/AMD 64 bits CPUs.
-- `x86_64-pc-windows-msvc` - Windows running on Intel/AMD 64 bits CPUs, compiled with Visual C++.
-- `x86_64-pc-windows-gnu` - Windows running on Intel/AMD 64 bits CPUs, compiled with GCC.
 - `x86_64-unknown-linux-gnu` - Linux running on Intel/AMD 64 bits CPUs, compiled with GCC.
-- `x86_64-unknown-linux-musl` - Linux running on Intel/AMD 64 bits CPUs, compiled with Musl.
-- `x86_64-unknown-freebsd` - FreeBSD running on Intel/AMD 64 bits.
 
 This means that Explorer is going to work without the need to compile it from source.
 
 This currently **only works for Hex releases**. For more information on how it works, please
 check the [RustlerPrecompiled project](https://hexdocs.pm/rustler_precompiled).
-
-### Legacy CPUs
-
-We ship some of the precompiled artifacts with modern CPU features enabled by default. But in
-case your computer is not compatible with them, you can set an application environment that is
-going to be read at compile time, enabling the legacy variants of artifacts.
-
-```elixir
-config :explorer, use_legacy_artifacts: true
-```
-
-If you see the error message "Illegal instruction" after your project compiles, you need to
-enable the legacy artifacts.
 
 ### Features disabled
 
@@ -306,4 +286,4 @@ of `ObjectStore` does not compile on it.
 
 ## Sponsors
 
-<a href="https://amplified.ai"><img src="sponsors/amplified.png" width=100 alt="Amplified"></a>
+<a href="https://amplified.ai"><img src="images/amplified.png" width=100 alt="Amplified"></a>

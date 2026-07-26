@@ -160,6 +160,27 @@ defmodule Explorer.QueryTest do
                c: ~w(one two three),
                c_copy: ~w(one two three)
              }
+
+      categories = ["open", "closed"]
+      dtype = {:enum, categories}
+
+      df =
+        DF.new(
+          status: Series.from_list(categories, dtype: dtype),
+          label: Series.from_list(["first", "second"])
+        )
+
+      assert df
+             |> DF.mutate(
+               for col <- across(), col.dtype == ^dtype do
+                 {:"#{col.name}_copy", col}
+               end
+             )
+             |> DF.to_columns(atom_keys: true) == %{
+               status: categories,
+               label: ["first", "second"],
+               status_copy: categories
+             }
     end
 
     test "uses across/1 to select some dataframe columns" do

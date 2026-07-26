@@ -38,14 +38,16 @@ defmodule Explorer.DataFrameTest do
       [conn: conn]
     end
 
-    test "queries database", %{conn: conn} do
-      {:ok, %DF{} = df} =
-        Explorer.DataFrame.from_query(conn, "SELECT 123 as num, 'abc' as str", [])
+    test "queries database without deprecation warnings", %{conn: conn} do
+      assert capture_io(:stderr, fn ->
+               {:ok, %DF{} = df} =
+                 Explorer.DataFrame.from_query(conn, "SELECT 123 as num, 'abc' as str", [])
 
-      assert DF.to_columns(df, atom_keys: true) == %{
-               num: [123],
-               str: ["abc"]
-             }
+               assert DF.to_columns(df, atom_keys: true) == %{
+                        num: [123],
+                        str: ["abc"]
+                      }
+             end) == ""
     end
 
     test "returns error", %{conn: conn} do

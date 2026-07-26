@@ -1,3 +1,4 @@
+use crate::datatypes::ExEnumDomain;
 use crate::ExplorerError;
 use polars::datatypes::CategoricalPhysical;
 use polars::datatypes::Categories;
@@ -42,6 +43,7 @@ pub enum ExSeriesDtype {
     Binary,
     Boolean,
     Category,
+    Enum(ExEnumDomain),
     Date,
     F(u8),
     S(u8),
@@ -57,6 +59,15 @@ pub enum ExSeriesDtype {
     Decimal(Option<usize>, Option<usize>),
 }
 
+pub fn contains_enum(dtype: &DataType) -> bool {
+    match dtype {
+        DataType::Enum(_, _) => true,
+        DataType::List(inner) | DataType::Array(inner, _) => contains_enum(inner),
+        DataType::Struct(fields) => fields.iter().any(|field| contains_enum(field.dtype())),
+        _ => false,
+    }
+}
+
 impl TryFrom<&DataType> for ExSeriesDtype {
     type Error = ExplorerError;
 
@@ -66,6 +77,9 @@ impl TryFrom<&DataType> for ExSeriesDtype {
             DataType::Binary => Ok(ExSeriesDtype::Binary),
             DataType::Boolean => Ok(ExSeriesDtype::Boolean),
             DataType::Categorical(_, _) => Ok(ExSeriesDtype::Category),
+            DataType::Enum(categories, _) => {
+                Ok(ExSeriesDtype::Enum(ExEnumDomain::new(categories.clone())))
+            }
             DataType::Date => Ok(ExSeriesDtype::Date),
             DataType::Float64 => Ok(ExSeriesDtype::F(64)),
             DataType::Float32 => Ok(ExSeriesDtype::F(32)),
@@ -127,6 +141,9 @@ impl TryFrom<&ExSeriesDtype> for DataType {
                     CategoricalPhysical::U32,
                 );
                 Ok(DataType::from_categories(cats.clone()))
+            }
+            ExSeriesDtype::Enum(domain) => {
+                Ok(DataType::from_frozen_categories(domain.resource.0.clone()))
             }
             ExSeriesDtype::Date => Ok(DataType::Date),
             ExSeriesDtype::F(64) => Ok(DataType::Float64),

@@ -27,6 +27,8 @@ use crate::{ExDataFrame, ExplorerError};
 #[cfg(feature = "cloud")]
 use crate::cloud_writer::CloudWriter;
 
+pub(crate) type CsvDtypePairs = Vec<(PlSmallStr, DataType)>;
+
 // ============ CSV ============ //
 
 #[rustler::nif(schedule = "DirtyIo")]
@@ -54,8 +56,10 @@ pub fn df_from_csv(
         _ => CsvEncoding::Utf8,
     };
 
-    let dataframe = CsvReadOptions::default()
-        .with_schema_overwrite(schema_from_dtypes_pairs(dtypes)?)
+    let (schema_overwrite, dtype_pairs) = schema_and_dtype_pairs(dtypes)?;
+
+    let mut dataframe = CsvReadOptions::default()
+        .with_schema_overwrite(schema_overwrite)
         .with_infer_schema_length(infer_schema_length)
         .with_has_header(has_header)
         .with_n_rows(stop_after_n_rows)
@@ -82,24 +86,64 @@ pub fn df_from_csv(
                 ))),
         )
         .try_into_reader_with_file_path(Some(filename.into()))?
-        .finish();
+        .finish()?;
 
-    Ok(ExDataFrame::new(dataframe?))
+    apply_full_dtype_pairs_by_position(&mut dataframe, dtype_pairs)?;
+
+    Ok(ExDataFrame::new(dataframe))
 }
 
-pub fn schema_from_dtypes_pairs(
+pub(crate) fn schema_and_dtype_pairs(
     dtypes: Vec<(&str, ExSeriesDtype)>,
-) -> Result<Option<Arc<Schema>>, ExplorerError> {
+) -> Result<(Option<Arc<Schema>>, CsvDtypePairs), ExplorerError> {
     if dtypes.is_empty() {
-        return Ok(None);
+        return Ok((None, vec![]));
     }
 
     let mut schema = Schema::with_capacity(dtypes.len());
+    let mut dtype_pairs = Vec::with_capacity(dtypes.len());
     for (name, ex_dtype) in dtypes {
         let dtype = DataType::try_from(&ex_dtype)?;
-        schema.with_column(name.into(), dtype);
+        let name = PlSmallStr::from_str(name);
+        schema.with_column(name.clone(), dtype.clone());
+        dtype_pairs.push((name, dtype));
     }
-    Ok(Some(Arc::new(schema)))
+    Ok((Some(Arc::new(schema)), dtype_pairs))
+}
+
+fn apply_full_dtype_pairs_by_position(
+    dataframe: &mut DataFrame,
+    dtype_pairs: CsvDtypePairs,
+) -> Result<(), ExplorerError> {
+    let matching_names = dtype_pairs
+        .iter()
+        .filter(|(name, _)| dataframe.try_get_column_index(name.as_str()).is_ok())
+        .count();
+
+    if matching_names == dtype_pairs.len() {
+        return Ok(());
+    }
+
+    if dtype_pairs.len() != dataframe.width() || matching_names != 0 {
+        return Err(ExplorerError::Other(
+            "dtype column names must either all match the CSV header or all be positional".into(),
+        ));
+    }
+
+    let names = dtype_pairs
+        .iter()
+        .map(|(name, _)| name.to_string())
+        .collect::<Vec<_>>();
+
+    for (idx, (_, dtype)) in dtype_pairs.into_iter().enumerate() {
+        dataframe.try_apply_at_idx(idx, |column| {
+            column.as_materialized_series().strict_cast(&dtype)
+        })?;
+    }
+
+    dataframe.set_column_names(&names)?;
+
+    Ok(())
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
@@ -190,9 +234,10 @@ pub fn df_load_csv(
     };
 
     let cursor = Cursor::new(binary.as_slice());
+    let (schema_overwrite, dtype_pairs) = schema_and_dtype_pairs(dtypes)?;
 
-    let dataframe = CsvReadOptions::default()
-        .with_schema_overwrite(schema_from_dtypes_pairs(dtypes)?)
+    let mut dataframe = CsvReadOptions::default()
+        .with_schema_overwrite(schema_overwrite)
         .with_has_header(has_header)
         .with_infer_schema_length(infer_schema_length)
         .with_n_rows(stop_after_n_rows)
@@ -218,9 +263,11 @@ pub fn df_load_csv(
                 .with_eol_char(eol_delimiter.unwrap_or(b'\n')),
         )
         .into_reader_with_file_handle(cursor)
-        .finish();
+        .finish()?;
 
-    Ok(ExDataFrame::new(dataframe?))
+    apply_full_dtype_pairs_by_position(&mut dataframe, dtype_pairs)?;
+
+    Ok(ExDataFrame::new(dataframe))
 }
 
 // ============ Parquet ============ //

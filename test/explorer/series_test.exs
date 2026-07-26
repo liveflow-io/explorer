@@ -107,6 +107,44 @@ defmodule Explorer.SeriesTest do
       assert Series.dtype(s) == :string
     end
 
+    test "with enum dtype" do
+      categories = ["low", "medium", "high"]
+      s = Series.from_list(["low", "high", "low"], dtype: {:enum, categories})
+
+      assert Series.to_list(s) == ["low", "high", "low"]
+      assert Series.dtype(s) == {:enum, categories}
+      assert Series.categories(s) |> Series.to_list() == categories
+      assert Series.iotype(s) == {:u, 32}
+
+      assert Series.to_iovec(s) == [
+               <<0::unsigned-32-native, 2::unsigned-32-native, 0::unsigned-32-native>>
+             ]
+    end
+
+    test "with enum dtype using u16 physical indices" do
+      categories = Enum.map(0..299, &"category-#{&1}")
+      s = Series.from_list(["category-0", "category-299"], dtype: {:enum, categories})
+
+      assert Series.to_iovec(s) == [
+               <<0::unsigned-32-native, 299::unsigned-32-native>>
+             ]
+    end
+
+    test "with enum dtype using u32 physical indices" do
+      categories = Enum.map(0..65_536, &"category-#{&1}")
+      s = Series.from_list(["category-0", "category-65536"], dtype: {:enum, categories})
+
+      assert Series.to_iovec(s) == [
+               <<0::unsigned-32-native, 65_536::unsigned-32-native>>
+             ]
+    end
+
+    test "with enum dtype raises on invalid values" do
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.from_list(["low", "unknown"], dtype: {:enum, ["low", "medium", "high"]})
+      end
+    end
+
     test "with time" do
       time = ~T[02:05:03.654321]
       s = Series.from_list([time])
@@ -973,6 +1011,15 @@ defmodule Explorer.SeriesTest do
                [true, false, false, nil, true]
 
       assert Series.equal(s, "a") |> Series.to_list() == [true, false, false, nil, true]
+    end
+
+    test "compare enums with strings" do
+      enum = Series.from_list(["open", "closed"], dtype: {:enum, ["open", "closed"]})
+      strings = Series.from_list(["open", "open"])
+
+      assert enum |> Series.equal("open") |> Series.to_list() == [true, false]
+      assert "open" |> Series.equal(enum) |> Series.to_list() == [true, false]
+      assert enum |> Series.equal(strings) |> Series.to_list() == [true, false]
     end
 
     test "compare decimal series" do
@@ -3978,6 +4025,15 @@ defmodule Explorer.SeriesTest do
       assert Series.select(predicate, on_true, on_false) |> Series.to_list() == [1, 0, 3, 0]
     end
 
+    test "select broadcasts a single string operand" do
+      predicate = Series.from_list([true, false, true, false])
+      on_true = Series.from_list(["unspecified"])
+      on_false = Series.from_list(["a", "b", "c", "d"])
+
+      assert Series.select(predicate, on_true, on_false) |> Series.to_list() ==
+               ["unspecified", "b", "unspecified", "d"]
+    end
+
     test "select allows if on_true or on_false is not same size as predicate, but both of them are of size 1" do
       predicate = Series.from_list([true, false, true, false])
       on_true = Series.from_list([1])
@@ -4438,6 +4494,29 @@ defmodule Explorer.SeriesTest do
 
       assert Series.to_list(s1) == ["apple", "banana", "apple", "lemon"]
       assert Series.dtype(s1) == :category
+    end
+
+    test "string series to enum" do
+      dtype = {:enum, ["apple", "banana", "lemon"]}
+      s = Series.from_list(["apple", "banana", "apple", "lemon"])
+      s1 = Series.cast(s, dtype)
+
+      assert Series.to_list(s1) == ["apple", "banana", "apple", "lemon"]
+      assert Series.dtype(s1) == dtype
+    end
+
+    test "string series to enum raises on invalid values" do
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.from_list(["apple", "orange"]) |> Series.cast({:enum, ["apple", "banana"]})
+      end
+    end
+
+    test "nested enum casts raise on invalid values" do
+      series = Series.from_list([["open"], ["pending"]])
+
+      assert_raise RuntimeError, ~r/invalid enum value/, fn ->
+        Series.cast(series, {:list, {:enum, ["open", "closed"]}})
+      end
     end
 
     test "string series to naive datetime" do
@@ -6169,6 +6248,8 @@ defmodule Explorer.SeriesTest do
     test "cut/3 with no nils" do
       series = -30..30//5 |> Enum.map(&(&1 / 10)) |> Enum.to_list() |> Series.from_list()
       df = Series.cut(series, [-1, 1])
+      assert Series.dtype(df[:category]) == {:enum, ["(-inf, -1]", "(-1, 1]", "(1, inf]"]}
+
       freqs = Series.frequencies(df[:category])
       assert Series.to_list(freqs[:values]) == ["(-inf, -1]", "(-1, 1]", "(1, inf]"]
       assert Series.to_list(freqs[:counts]) == [5, 4, 4]
@@ -6196,6 +6277,7 @@ defmodule Explorer.SeriesTest do
         )
 
       assert Explorer.DataFrame.names(df) == ["values", "bp", "cat"]
+      assert Series.dtype(df[:cat]) == {:enum, ["x", "y"]}
     end
 
     test "cut/3 with include breaks" do
@@ -6212,6 +6294,8 @@ defmodule Explorer.SeriesTest do
     test "qcut/3" do
       series = Enum.to_list(-5..3) |> Series.from_list()
       df = Series.qcut(series, [0.0, 0.25, 0.75])
+      assert Series.dtype(df[:category]) == :category
+
       freqs = Series.frequencies(df[:category])
 
       assert Series.to_list(freqs[:values]) == [
@@ -6779,11 +6863,7 @@ defmodule Explorer.SeriesTest do
       s = Series.from_list(["1", "\"a\""])
 
       assert_raise RuntimeError,
-                   ~s"""
-                   Polars Error: error deserializing JSON: error deserializing value "String("a")" as numeric. \\
-                               Try increasing `infer_schema_length` or specifying a schema.
-                               \
-                   """,
+                   "Polars Error: error deserializing JSON: error deserializing value \"String(\"a\")\" as numeric.\n\nTry increasing `infer_schema_length` or specifying a schema.",
                    fn -> Series.json_decode(s, {:s, 64}) end
     end
 

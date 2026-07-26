@@ -569,8 +569,15 @@ fn time_series_to_list<'b>(s: &Series, env: Env<'b>) -> Result<Term<'b>, Explore
 fn generic_string_series_to_list<'b>(s: &Series, env: Env<'b>) -> Result<Term<'b>, ExplorerError> {
     Ok(unsafe_iterator_series_to_list!(
         env,
-        s.str()?.into_iter().map(|option| option.encode(env))
+        s.str()?.iter().map(|option| option.encode(env))
     ))
+}
+
+pub fn string_list_from_iter<'a, 'b>(
+    iterator: impl DoubleEndedIterator<Item = &'a str>,
+    env: Env<'b>,
+) -> Term<'b> {
+    unsafe_iterator_series_to_list!(env, iterator.map(|value| value.encode(env)))
 }
 
 fn generic_binary_series_to_list<'b>(
@@ -612,7 +619,7 @@ macro_rules! float_series_to_list {
 
             Ok(unsafe_iterator_series_to_list!(
                 env,
-                s.$convert_function()?.into_iter().map(|option| {
+                s.$convert_function()?.iter().map(|option| {
                     match option {
                         Some(x) => {
                             if x.is_finite() {
@@ -641,7 +648,7 @@ macro_rules! series_to_list {
         Ok(unsafe_iterator_series_to_list!(
             $env,
             $s.$convert_function()?
-                .into_iter()
+                .iter()
                 .map(|option| option.encode($env))
         ))
     };
@@ -709,7 +716,9 @@ pub fn resource_term_from_value<'b>(
             encode_datetime(v, time_unit, time_zone.parse::<Tz>().unwrap(), env)
         }
         AnyValue::Duration(v, time_unit) => encode_duration(v, time_unit, env),
-        AnyValue::Categorical(idx, mapping) => Ok(mapping.cat_to_str(idx).encode(env)),
+        AnyValue::Categorical(idx, mapping) | AnyValue::Enum(idx, mapping) => {
+            Ok(mapping.cat_to_str(idx).encode(env))
+        }
         AnyValue::List(series) => list_from_series(ExSeries::new(series), env),
         AnyValue::Struct(_, _, fields) => v
             ._iter_struct_av()
@@ -773,11 +782,11 @@ pub fn list_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
 
         DataType::Binary => generic_binary_series_to_list(&s.resource, &s, env),
         DataType::String => generic_string_series_to_list(&s, env),
-        DataType::Categorical(_, _) => categorical_series_to_list(&s, env),
+        DataType::Categorical(_, _) | DataType::Enum(_, _) => categorical_series_to_list(&s, env),
 
         DataType::List(_inner_dtype) => s
             .list()?
-            .into_iter()
+            .series_iter()
             .map(|item| match item {
                 Some(list) => list_from_series(ExSeries::new(list), env),
                 None => Ok(None::<bool>.encode(env)),
@@ -802,7 +811,7 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         DataType::Boolean => {
             let mut bin = OwnedBinary::new(s.len()).unwrap();
             let slice = bin.as_mut_slice();
-            for (i, v) in s.bool()?.into_iter().enumerate() {
+            for (i, v) in s.bool()?.iter().enumerate() {
                 slice[i] = v.unwrap() as u8;
             }
             Ok([bin.release(env)].encode(env))
@@ -827,6 +836,38 @@ pub fn iovec_from_series(s: ExSeries, env: Env) -> Result<Term, ExplorerError> {
         }
         DataType::Categorical(_, _) => {
             series_to_iovec!(resource, s.cast(&DataType::UInt32)?.u32()?, env, u32)
+        }
+        DataType::Enum(_, _) => {
+            let physical = s.to_physical_repr();
+
+            if matches!(physical.dtype(), DataType::UInt32) {
+                return series_to_iovec!(resource, physical.u32()?, env, u32);
+            }
+
+            let mut bin = OwnedBinary::new(s.len() * mem::size_of::<u32>()).unwrap();
+
+            macro_rules! write_enum_indices {
+                ($values:expr) => {
+                    for (idx, value) in $values.iter().enumerate() {
+                        let value = u32::from(value.expect("nil enum checked by s_to_iovec"));
+                        let offset = idx * mem::size_of::<u32>();
+                        bin.as_mut_slice()[offset..offset + mem::size_of::<u32>()]
+                            .copy_from_slice(&value.to_ne_bytes());
+                    }
+                };
+            }
+
+            match physical.dtype() {
+                DataType::UInt8 => write_enum_indices!(physical.u8()?),
+                DataType::UInt16 => write_enum_indices!(physical.u16()?),
+                dtype => {
+                    return Err(ExplorerError::Other(format!(
+                        "unsupported physical enum dtype: {dtype}"
+                    )))
+                }
+            }
+
+            Ok([bin.release(env)].encode(env))
         }
         dt => panic!("to_iovec/1 not implemented for {dt:?}"),
     }

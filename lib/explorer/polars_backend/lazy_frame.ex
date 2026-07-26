@@ -8,7 +8,7 @@ defmodule Explorer.PolarsBackend.LazyFrame do
   alias Explorer.PolarsBackend.Shared
   alias Explorer.PolarsBackend.DataFrame, as: Eager
 
-  import Explorer.PolarsBackend.Expression, only: [to_expr: 1, alias_expr: 2]
+  import Explorer.PolarsBackend.Expression, only: [to_expr: 1, to_expr: 2, alias_expr: 2]
 
   # This resource is going to be a "ResourceArc" on Rust side.
   defstruct resource: nil
@@ -501,23 +501,20 @@ defmodule Explorer.PolarsBackend.LazyFrame do
 
   @impl true
   def mutate_with(%DF{} = df, %DF{} = out_df, column_pairs) do
-    maybe_over_groups_fun =
-      if df.groups.columns == [] do
-        &Function.identity/1
-      else
-        fn expr -> Native.expr_over(expr, groups_exprs(df.groups.columns)) end
-      end
+    groups_exprs = groups_exprs(df.groups.columns)
 
     exprs =
       for {name, lazy_series} <- column_pairs do
         lazy_series
-        |> to_expr()
-        |> then(maybe_over_groups_fun)
+        |> to_expr_for_mutate(groups_exprs)
         |> alias_expr(name)
       end
 
     Shared.apply_dataframe(df, out_df, :lf_mutate_with, [exprs])
   end
+
+  defp to_expr_for_mutate(lazy_series, []), do: to_expr(lazy_series)
+  defp to_expr_for_mutate(lazy_series, groups_exprs), do: to_expr(lazy_series, groups_exprs)
 
   @impl true
   def rename(%DF{} = df, %DF{} = out_df, pairs),
@@ -638,10 +635,36 @@ defmodule Explorer.PolarsBackend.LazyFrame do
 
   @impl true
   def concat_rows([%DF{} | _tail] = dfs, %DF{} = out_df) do
-    polars_dfs = Enum.map(dfs, fn df -> select(df, out_df).data end)
+    polars_dfs =
+      Enum.map(dfs, fn df ->
+        df
+        |> cast_to_output_dtypes(out_df)
+        |> select(out_df)
+        |> then(& &1.data)
+      end)
+
     %__MODULE__{} = polars_df = Shared.apply(:lf_concat_rows, [polars_dfs])
 
     %{out_df | data: polars_df}
+  end
+
+  defp cast_to_output_dtypes(%DF{} = df, %DF{} = out_df) do
+    casts =
+      for {name, dtype} <- out_df.dtypes,
+          not Explorer.Shared.dtype_equal?(df.dtypes[name], dtype),
+          do: {name, dtype}
+
+    case casts do
+      [] ->
+        df
+
+      casts ->
+        DF.mutate_with(df, fn ldf ->
+          for {name, dtype} <- casts do
+            {name, Explorer.Series.cast(ldf[name], dtype)}
+          end
+        end)
+    end
   end
 
   @impl true

@@ -7,36 +7,34 @@ authors = []
 edition = "2021"
 
 [lib]
+crate-type = ["cdylib"]
 name = "explorer"
 path = "src/lib.rs"
-crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1"
 chrono = "0.4"
 chrono-tz = "0.10"
+either = "1"
 rand = { version = "0.8", features = ["alloc"] }
 rand_pcg = "0.3"
+reqwest = { version = "0.12", default-features = false }
 rustler = { version = "0.36" }
 thiserror = "2"
-either = "1"
-reqwest = { version = "0.12", default-features = false }
 
-# Deps necessary for cloud features.
-tokio = { version = "1.40", default-features = false, features = [
-  "rt",
-], optional = true }
-object_store = { version = "0.12", default-features = false, optional = true }
-polars-arrow = "0.52"
-polars-lazy = "0.52"
+object_store = { version = "0.13", default-features = false, optional = true }
+polars-arrow = "0.54.4"
+polars-lazy = "0.54.4"
+polars-parquet = "0.54.4"
 
-# MiMalloc won´t compile on Windows with the GCC compiler.
-# On Linux with Musl it won´t load correctly.
-[target.'cfg(not(any(all(windows, target_env = "gnu"), all(target_os = "linux", target_env = "musl"))))'.dependencies]
-mimalloc = { version = "*", default-features = false }
+[dependencies.tokio]
+version = "1.40"
+default-features = false
+features = ["rt"]
+optional = true
 
 [dependencies.polars]
-version = "0.52"
+version = "0.54.4"
 default-features = false
 features = [
   "abs",
@@ -54,13 +52,15 @@ features = [
   "ewma",
   "extract_groups",
   "extract_jsonpath",
-  "ipc_streaming",
+  "index_of",
   "ipc",
+  "ipc_streaming",
   "is_in",
   "lazy",
   "log",
   "mode",
   "moment",
+  "object",
   "parquet",
   "peaks",
   "performant",
@@ -74,6 +74,7 @@ features = [
   "rolling_window",
   "round_series",
   "rows",
+  "search_sorted",
   "simd",
   "sql",
   "strings",
@@ -81,21 +82,23 @@ features = [
   "timezones",
   "to_dummies",
   "trigonometry",
-  "object",
-  "index_of",
-  "search_sorted",
 ]
 
 [dependencies.polars-ops]
-version = "0.52"
-features = ["abs", "ewma", "cum_agg", "cov", "index_of"]
+version = "0.54.4"
+features = ["abs", "cov", "cum_agg", "ewma", "index_of"]
+
+# MiMalloc won´t compile on Windows with the GCC compiler.
+# On Linux with Musl it won´t load correctly.
+[target.'cfg(not(any(all(windows, target_env = "gnu"), all(target_os = "linux", target_env = "musl"))))'.dependencies]
+mimalloc = { version = "*", default-features = false }
 
 [features]
-default = ["ndjson", "cloud", "nif_version_2_15"]
+default = ["cloud", "ndjson", "nif_version_2_15"]
 
-cloud = ["object_store", "tokio", "aws", "polars/cloud"]
-ndjson = ["polars/json"]
 aws = ["object_store/aws", "polars/async", "polars/aws"]
+cloud = ["aws", "object_store", "polars/cloud", "tokio"]
+ndjson = ["polars/json"]
 
 # Feature necessary for Rustler Precompiled.
 nif_version_2_15 = ["rustler/nif_version_2_15"]

@@ -22,7 +22,7 @@ defmodule Explorer.PolarsBackend.Shared do
   # Applies to a series. Expects a series or a value back.
   def apply_series(%Series{} = series, fun, args \\ []) do
     case apply(Native, fun, [series.data | args]) do
-      {:ok, %PolarsSeries{} = new_series} -> create_series(new_series)
+      {:ok, %PolarsSeries{} = new_series} -> create_series(new_series, series)
       {:ok, value} -> value
       {:error, error} -> raise runtime_error(error)
     end
@@ -57,7 +57,7 @@ defmodule Explorer.PolarsBackend.Shared do
             end
 
           if Enum.sort(out_df.names) != Enum.sort(check_df.names) or
-               out_df.dtypes != check_df.dtypes do
+               not Explorer.Shared.dtype_map_equal?(out_df.dtypes, check_df.dtypes) do
             raise """
             DataFrame mismatch.
 
@@ -93,6 +93,19 @@ defmodule Explorer.PolarsBackend.Shared do
 
     Explorer.Backend.Series.new(polars_series, dtype)
   end
+
+  defp create_series(
+         %PolarsSeries{} = polars_series,
+         %Series{data: previous_series, dtype: {:enum, _} = dtype}
+       ) do
+    if apply(:s_same_dtype, [polars_series, previous_series]) do
+      Explorer.Backend.Series.new(polars_series, dtype)
+    else
+      create_series(polars_series)
+    end
+  end
+
+  defp create_series(%PolarsSeries{} = polars_series, %Series{}), do: create_series(polars_series)
 
   def create_dataframe(polars_df) do
     with {:ok, names} <- df_names(polars_df), {:ok, dtypes} <- df_dtypes(polars_df) do
@@ -182,6 +195,7 @@ defmodule Explorer.PolarsBackend.Shared do
       :boolean -> Native.s_from_list_bool(name, list)
       :string -> Native.s_from_list_str(name, list)
       :category -> Native.s_from_list_categories(name, list)
+      {:enum, categories} -> apply(:s_from_list_enum, [name, list, categories])
       :date -> apply(:s_from_list_date, [name, list])
       :time -> apply(:s_from_list_time, [name, list])
       {:naive_datetime, precision} -> apply(:s_from_list_naive_datetime, [name, list, precision])

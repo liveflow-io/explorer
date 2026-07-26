@@ -19,7 +19,7 @@ defmodule Explorer.Backend.DataFrame do
 
   @type series :: Explorer.Series.t()
   @type column_name :: String.t()
-  @type dtype :: Explorer.Series.dtype()
+  @type dtype :: Explorer.Series.internal_dtype()
   @type dtypes :: %{column_name() => dtype()}
   @type io_dtypes :: [{column_name(), dtype()}]
 
@@ -312,8 +312,7 @@ defmodule Explorer.Backend.DataFrame do
   defp build_cols_algebra(df, inspect_opts, true) do
     for name <- DataFrame.names(df) do
       type =
-        df
-        |> DataFrame.dtypes()
+        df.dtypes
         |> Map.get(name)
         |> Explorer.Shared.dtype_to_string()
 
@@ -342,8 +341,7 @@ defmodule Explorer.Backend.DataFrame do
         |> Explorer.Shared.to_doc(inspect_opts)
 
       type =
-        series
-        |> Series.dtype()
+        series.dtype
         |> Explorer.Shared.dtype_to_string()
 
       A.concat([

@@ -5,8 +5,8 @@
 // wrapped in an Elixir struct.
 
 use crate::datatypes::{
-    ExCorrelationMethod, ExDate, ExDateTime, ExDuration, ExNaiveDateTime, ExRankMethod,
-    ExSeriesDtype, ExValidValue,
+    contains_enum, ExCorrelationMethod, ExDate, ExDateTime, ExDuration, ExNaiveDateTime,
+    ExRankMethod, ExSeriesDtype, ExValidValue,
 };
 use crate::series::{cast_str_to_f64, ewm_opts, rolling_opts_fixed_window};
 use crate::{ExDataFrame, ExExpr, ExSeries};
@@ -100,6 +100,20 @@ pub fn expr_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
     let expr = data.clone_inner();
     let to_dtype = DataType::try_from(&to_dtype).expect("dtype is not valid");
 
+    if contains_enum(&to_dtype) {
+        ExExpr::new(expr.strict_cast(to_dtype))
+    } else {
+        ExExpr::new(expr.cast(to_dtype))
+    }
+}
+
+/// Casts without the strictness `expr_cast/2` applies to enums: values outside the
+/// domain become null rather than failing the query.
+#[rustler::nif]
+pub fn expr_lenient_cast(data: ExExpr, to_dtype: ExSeriesDtype) -> ExExpr {
+    let expr = data.clone_inner();
+    let to_dtype = DataType::try_from(&to_dtype).expect("dtype is not valid");
+
     ExExpr::new(expr.cast(to_dtype))
 }
 
@@ -178,7 +192,7 @@ pub fn expr_binary_in(left: ExExpr, right: ExExpr) -> ExExpr {
     let left_expr = left.clone_inner();
     let right_expr = right.clone_inner();
 
-    ExExpr::new(left_expr.is_in(right_expr.implode(), false))
+    ExExpr::new(left_expr.is_in(right_expr.implode(true), false))
 }
 
 #[rustler::nif]
@@ -236,7 +250,7 @@ pub fn expr_slice(expr: ExExpr, offset: i64, length: u32) -> ExExpr {
 pub fn expr_slice_by_indices(expr: ExExpr, indices_expr: ExExpr) -> ExExpr {
     let expr = expr.clone_inner();
 
-    ExExpr::new(expr.gather(indices_expr.clone_inner()))
+    ExExpr::new(expr.gather(indices_expr.clone_inner(), false))
 }
 
 #[rustler::nif]
@@ -481,7 +495,7 @@ pub fn expr_median(expr: ExExpr) -> ExExpr {
 pub fn expr_mode(expr: ExExpr) -> ExExpr {
     let expr = expr.clone_inner();
 
-    ExExpr::new(expr.mode())
+    ExExpr::new(expr.mode(false))
 }
 
 #[rustler::nif]
@@ -542,7 +556,11 @@ pub fn expr_correlation(left: ExExpr, right: ExExpr, method: ExCorrelationMethod
 pub fn expr_covariance(left: ExExpr, right: ExExpr, ddof: u8) -> ExExpr {
     let left_expr = left.clone_inner().cast(DataType::Float64);
     let right_expr = right.clone_inner().cast(DataType::Float64);
-    ExExpr::new(cov(left_expr, right_expr, ddof))
+    ExExpr::new(
+        when(dsl::len().gt(lit(ddof)))
+            .then(cov(left_expr, right_expr, ddof))
+            .otherwise(lit(NULL)),
+    )
 }
 
 #[rustler::nif]
@@ -1157,10 +1175,7 @@ pub fn expr_member(expr: ExExpr, value: ExValidValue, inner_dtype: ExSeriesDtype
     let expr = expr.clone_inner();
     let inner_dtype = DataType::try_from(&inner_dtype).unwrap();
 
-    ExExpr::new(
-        expr.list()
-            .contains(value.lit_with_matching_precision(&inner_dtype), false),
-    )
+    ExExpr::new(value.list_contains(expr, &inner_dtype))
 }
 
 #[rustler::nif]
@@ -1204,7 +1219,7 @@ pub fn expr_struct(ex_exprs: Vec<ExExpr>) -> ExExpr {
 
 #[rustler::nif]
 pub fn expr_over(left: ExExpr, groups: Vec<ExExpr>) -> ExExpr {
-    let expr = left.clone_inner().over(groups);
+    let expr = left.clone_inner().over(groups).unwrap();
     ExExpr::new(expr)
 }
 

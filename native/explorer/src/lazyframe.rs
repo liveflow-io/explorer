@@ -2,7 +2,11 @@ use crate::{
     datatypes::ExSeriesDtype, expressions::ex_expr_to_exprs, ExDataFrame, ExExpr, ExLazyFrame,
     ExplorerError,
 };
-use polars::{lazy::dsl::Selector, prelude::*};
+use polars::{
+    chunked_array::ops::ExplodeOptions,
+    lazy::dsl::{HConcatOptions, Selector},
+    prelude::*,
+};
 use rustler::NifMap;
 
 #[derive(NifMap)]
@@ -153,7 +157,13 @@ pub fn lf_slice(
         let groups_exprs: Vec<Expr> = groups.iter().map(col).collect();
         lf.group_by_opt_order(groups_exprs, stable_groups)
             .agg([col("*").slice(offset, length)])
-            .explode(all().exclude_cols(groups))
+            .explode(
+                all().exclude_cols(groups),
+                ExplodeOptions {
+                    empty_as_null: true,
+                    keep_nulls: true,
+                },
+            )
     };
 
     Ok(ExLazyFrame::new(result_lf))
@@ -161,7 +171,13 @@ pub fn lf_slice(
 
 #[rustler::nif]
 pub fn lf_explode(data: ExLazyFrame, columns: Vec<&str>) -> Result<ExLazyFrame, ExplorerError> {
-    let lf = data.clone_inner().explode(cols(columns));
+    let lf = data.clone_inner().explode(
+        cols(columns),
+        ExplodeOptions {
+            empty_as_null: true,
+            keep_nulls: true,
+        },
+    );
     Ok(ExLazyFrame::new(lf))
 }
 
@@ -209,9 +225,8 @@ pub fn lf_grouped_sort_with(
     // For grouped lazy frames, we need to use the `#sort_by` method that is
     // less powerful, but can be used with `over`.
     // See: https://docs.pola.rs/user-guide/expressions/window/#operations-per-group
-    let ldf = data
-        .clone_inner()
-        .with_columns([col("*").sort_by(expressions, sort_options).over(groups)]);
+    let expr = col("*").sort_by(expressions, sort_options).over(groups)?;
+    let ldf = data.clone_inner().with_columns([expr]);
 
     Ok(ExLazyFrame::new(ldf))
 }
@@ -309,8 +324,8 @@ pub fn lf_pivot_longer(
 ) -> Result<ExLazyFrame, ExplorerError> {
     let ldf = data.clone_inner();
     let unpivot_opts = polars::lazy::dsl::UnpivotArgsDSL {
-        index: by_name(id_vars, true),
-        on: by_name(value_vars, true),
+        index: by_name(id_vars, true, false),
+        on: Some(by_name(value_vars, true, false)),
         variable_name: Some(names_to.into()),
         value_name: Some(values_to.into()),
     };
@@ -339,7 +354,17 @@ pub fn lf_join(
         }
     };
 
-    let ldf = data.clone_inner();
+    let left_on = ex_expr_to_exprs(left_on);
+    let right_on = ex_expr_to_exprs(right_on);
+
+    // Polars 0.54's expression simplifier can segfault for a filtered
+    // aggregation joined on differently named keys. Keep simplification
+    // enabled for the common case where both sides use identical keys.
+    let ldf = if left_on == right_on {
+        data.clone_inner()
+    } else {
+        data.clone_inner().with_simplify_expr(false)
+    };
     let ldf1 = other.clone_inner();
 
     let new_ldf = match how {
@@ -356,8 +381,8 @@ pub fn lf_join(
             .join_builder()
             .with(ldf1)
             .how(how)
-            .left_on(ex_expr_to_exprs(left_on))
-            .right_on(ex_expr_to_exprs(right_on))
+            .left_on(left_on)
+            .right_on(right_on)
             .suffix(&opts.suffix)
             .join_nulls(opts.nulls_equal)
             .finish(),
@@ -427,7 +452,10 @@ pub fn lf_join_asof(
 #[rustler::nif]
 pub fn lf_concat_rows(lazy_frames: Vec<ExLazyFrame>) -> Result<ExLazyFrame, ExplorerError> {
     let inputs: Vec<LazyFrame> = lazy_frames.iter().map(|lf| lf.clone_inner()).collect();
-    let union_args = UnionArgs::default();
+    let union_args = UnionArgs {
+        to_supertypes: true,
+        ..Default::default()
+    };
     let out_df = concat(inputs, union_args)?;
 
     Ok(ExLazyFrame::new(out_df))
@@ -471,7 +499,7 @@ pub fn lf_concat_columns(ldfs: Vec<ExLazyFrame>) -> Result<ExLazyFrame, Explorer
         })
         .collect();
 
-    let out_ldf = concat_lf_horizontal(renamed_ldfs, UnionArgs::default())?;
+    let out_ldf = concat_lf_horizontal(renamed_ldfs, HConcatOptions::default())?;
 
     Ok(ExLazyFrame::new(out_ldf))
 }

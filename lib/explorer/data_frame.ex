@@ -263,7 +263,7 @@ defmodule Explorer.DataFrame do
           data: Explorer.Backend.DataFrame.t(),
           groups: %{columns: [String.t()], stable?: boolean()},
           names: [String.t()],
-          dtypes: %{String.t() => Explorer.Series.dtype()}
+          dtypes: %{String.t() => Explorer.Series.internal_dtype()}
         }
 
   @typedoc """
@@ -2154,7 +2154,7 @@ defmodule Explorer.DataFrame do
   """
   @doc type: :introspection
   @spec dtypes(df :: DataFrame.t()) :: %{String.t() => Explorer.Series.dtype()}
-  def dtypes(df), do: df.dtypes
+  def dtypes(df), do: Shared.external_dtypes(df.dtypes)
 
   @doc """
   Gets the shape of the dataframe as a `{height, width}` tuple.
@@ -4852,19 +4852,15 @@ defmodule Explorer.DataFrame do
     columns_to_keep =
       (columns_to_keep -- columns_to_pivot) -- to_existing_columns(df, opts[:discard])
 
-    values_dtype =
+    [values_dtype | other_dtypes] =
       dtypes
       |> Map.take(columns_to_pivot)
       |> Map.values()
-      |> Enum.uniq()
-      |> case do
-        [dtype] ->
-          dtype
 
-        [_ | _] = dtypes ->
-          raise ArgumentError,
-                "columns to pivot must include columns with the same dtype, but found multiple dtypes: #{Shared.inspect_dtypes(dtypes)}"
-      end
+    unless Enum.all?(other_dtypes, &Shared.dtype_equal?(values_dtype, &1)) do
+      raise ArgumentError,
+            "columns to pivot must include columns with the same dtype, but found multiple dtypes: #{Shared.inspect_dtypes([values_dtype | other_dtypes])}"
+    end
 
     new_dtypes =
       dtypes

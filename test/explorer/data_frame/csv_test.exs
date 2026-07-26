@@ -366,6 +366,61 @@ defmodule Explorer.DataFrame.CSVTest do
     end
 
     @tag :tmp_dir
+    test "dtypes - mismatched names", config do
+      csv =
+        tmp_csv(config.tmp_dir, """
+        first_name , last_name , dob
+        Alice , Ant , 01/02/1970
+        Billy , Bat , 03/04/1990
+        """)
+
+      types = [
+        {"first_name", :string},
+        {"last_name", :string},
+        {"dob", :string}
+      ]
+
+      expected = %{
+        dob: [" 01/02/1970", " 03/04/1990"],
+        first_name: ["Alice ", "Billy "],
+        last_name: [" Ant ", " Bat "]
+      }
+
+      assert csv
+             |> DF.from_csv!(dtypes: types)
+             |> DF.to_columns(atom_keys: true) == expected
+
+      assert csv
+             |> DF.from_csv!(dtypes: types, lazy: true)
+             |> DF.collect()
+             |> DF.to_columns(atom_keys: true) == expected
+    end
+
+    @tag :tmp_dir
+    test "dtypes - partially mismatched names raise", config do
+      csv = tmp_csv(config.tmp_dir, "a,b\n1,x\n")
+
+      for types <- [[{"b", :string}, {"typo", :string}], [{"typo", :string}]],
+          lazy <- [false, true] do
+        assert_raise RuntimeError, ~r/must either all match.*or all be positional/, fn ->
+          DF.from_csv!(csv, dtypes: types, lazy: lazy)
+        end
+      end
+    end
+
+    @tag :tmp_dir
+    test "dtypes - positional casts are strict", config do
+      csv = tmp_csv(config.tmp_dir, "age \n1\nbad\n")
+
+      for lazy <- [false, true] do
+        assert_raise RuntimeError, ~r/conversion|cast|parse/i, fn ->
+          df = DF.from_csv!(csv, dtypes: [{"age", {:s, 64}}], lazy: lazy)
+          if lazy, do: DF.collect(df)
+        end
+      end
+    end
+
+    @tag :tmp_dir
     test "dtypes - all as strings", config do
       csv =
         tmp_csv(config.tmp_dir, """

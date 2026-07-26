@@ -170,6 +170,7 @@ defmodule Explorer.PolarsBackend.Expression do
     divide: 2,
     multiply: 2,
     cast: 2,
+    lenient_cast: 2,
     fill_missing_with_strategy: 2,
     from_list: 2,
     from_binary: 2,
@@ -194,9 +195,65 @@ defmodule Explorer.PolarsBackend.Expression do
     raise ArgumentError, "missing #{inspect(__MODULE__)} nodes: #{inspect(missing)}"
   end
 
+  def to_expr(%LazySeries{} = lazy_series, groups_exprs) do
+    if has_aggregation?(lazy_series) do
+      lazy_series
+      |> over_aggregation_boundaries(groups_exprs)
+      |> to_expr()
+    else
+      lazy_series
+      |> to_expr()
+      |> Native.expr_over(groups_exprs)
+    end
+  end
+
+  defp over_aggregation_boundaries(%LazySeries{aggregation: true} = lazy_series, groups_exprs) do
+    if Enum.any?(lazy_series.args, &has_aggregation?/1) do
+      %{
+        lazy_series
+        | args: Enum.map(lazy_series.args, &over_aggregation_boundaries(&1, groups_exprs))
+      }
+    else
+      lazy_series
+      |> to_expr()
+      |> Native.expr_over(groups_exprs)
+    end
+  end
+
+  defp over_aggregation_boundaries(%LazySeries{} = lazy_series, groups_exprs) do
+    %{
+      lazy_series
+      | args: Enum.map(lazy_series.args, &over_aggregation_boundaries(&1, groups_exprs))
+    }
+  end
+
+  defp over_aggregation_boundaries(list, groups_exprs) when is_list(list) do
+    Enum.map(list, &over_aggregation_boundaries(&1, groups_exprs))
+  end
+
+  defp over_aggregation_boundaries(map, groups_exprs) when is_map(map) and not is_struct(map) do
+    Map.new(map, fn {key, value} -> {key, over_aggregation_boundaries(value, groups_exprs)} end)
+  end
+
+  defp over_aggregation_boundaries(other, _groups_exprs), do: other
+
+  defp has_aggregation?(%LazySeries{aggregation: true}), do: true
+  defp has_aggregation?(%LazySeries{args: args}), do: Enum.any?(args, &has_aggregation?/1)
+  defp has_aggregation?(list) when is_list(list), do: Enum.any?(list, &has_aggregation?/1)
+
+  defp has_aggregation?(map) when is_map(map) and not is_struct(map),
+    do: Enum.any?(Map.values(map), &has_aggregation?/1)
+
+  defp has_aggregation?(_other), do: false
+
   def to_expr(%LazySeries{op: :cast, args: [lazy_series, dtype]}) do
     lazy_series_expr = to_expr(lazy_series)
     Native.expr_cast(lazy_series_expr, dtype)
+  end
+
+  def to_expr(%LazySeries{op: :lenient_cast, args: [lazy_series, dtype]}) do
+    lazy_series_expr = to_expr(lazy_series)
+    Native.expr_lenient_cast(lazy_series_expr, dtype)
   end
 
   def to_expr(%LazySeries{op: :fill_missing_with_strategy, args: [lazy_series, strategy]}) do
@@ -350,8 +407,31 @@ defmodule Explorer.PolarsBackend.Expression do
   def to_expr(%DateTime{} = datetime), do: Native.expr_datetime(datetime)
   def to_expr(%Explorer.Duration{} = duration), do: Native.expr_duration(duration)
 
-  def to_expr(%Explorer.Series{data: %PolarsSeries{} = polars_series}),
-    do: Native.expr_series(polars_series)
+  def to_expr(%__MODULE__{} = expression), do: expression
+
+  def to_expr(%Explorer.Series{data: %PolarsSeries{} = polars_series} = series) do
+    with 1 <- Explorer.Series.size(series),
+         [value] <- Explorer.Series.to_list(series) do
+      cond do
+        is_nil(value) ->
+          Native.expr_cast(Native.expr_nil(), series.dtype)
+
+        series.dtype == :binary ->
+          polars_series
+          |> Native.expr_series()
+          |> Native.expr_first()
+
+        scalar_literal?(value) ->
+          Native.expr_cast(to_expr(value), series.dtype)
+
+        true ->
+          Native.expr_series(polars_series)
+      end
+    else
+      _ ->
+        Native.expr_series(polars_series)
+    end
+  end
 
   def to_expr(%_{} = struct),
     do: raise("unsupported struct in expression: #{inspect(struct)}")
@@ -364,6 +444,18 @@ defmodule Explorer.PolarsBackend.Expression do
 
     Native.expr_struct(expr_list)
   end
+
+  defp scalar_literal?(nil), do: true
+  defp scalar_literal?(value) when is_boolean(value), do: true
+  defp scalar_literal?(value) when is_atom(value), do: true
+  defp scalar_literal?(value) when is_binary(value), do: true
+  defp scalar_literal?(value) when is_integer(value), do: true
+  defp scalar_literal?(value) when is_float(value), do: true
+  defp scalar_literal?(%Date{}), do: true
+  defp scalar_literal?(%NaiveDateTime{}), do: true
+  defp scalar_literal?(%DateTime{}), do: true
+  defp scalar_literal?(%Explorer.Duration{}), do: true
+  defp scalar_literal?(_value), do: false
 
   # Used by Explorer.PolarsBackend.DataFrame
   def alias_expr(%__MODULE__{} = expr, alias_name) when is_binary(alias_name) do

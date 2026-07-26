@@ -1,8 +1,9 @@
 use crate::atoms;
 use crate::datatypes::{
     ex_datetime_to_timestamp, ex_naive_datetime_to_timestamp, ExDate, ExDateTime, ExDecimal,
-    ExDuration, ExNaiveDateTime, ExSeriesDtype, ExTime, ExTimeUnit,
+    ExDuration, ExEnumDomain, ExNaiveDateTime, ExSeriesDtype, ExTime, ExTimeUnit,
 };
+use crate::series::cast_enum_strictly;
 use crate::{ExSeries, ExplorerError};
 use std::cmp;
 
@@ -421,6 +422,21 @@ pub fn s_from_list_categories(name: &str, val: Term) -> NifResult<ExSeries> {
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
+pub fn s_from_list_enum(
+    name: &str,
+    val: Term,
+    domain: ExEnumDomain,
+) -> Result<ExSeries, ExplorerError> {
+    let decoded = val.decode::<Vec<Option<&str>>>().map_err(|err| {
+        ExplorerError::Other(format!("from_list/2 cannot decode enum values: {err:?}"))
+    })?;
+    let dtype = DataType::try_from(&ExSeriesDtype::Enum(domain))?;
+    let series = Series::new(name.into(), decoded.as_slice());
+
+    Ok(ExSeries::new(cast_enum_strictly(&series, &dtype)?))
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_from_list_of_series(
     name: &str,
     series_term: Term,
@@ -461,7 +477,7 @@ pub fn s_from_list_of_series_as_structs(
         .map(|c| Column::from(c.clone_inner()))
         .collect();
 
-    let df = DataFrame::new(columns).unwrap();
+    let df = DataFrame::new_infer_height(columns).unwrap();
 
     df.into_struct(name.into())
         .into_series()

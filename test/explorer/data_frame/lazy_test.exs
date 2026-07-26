@@ -705,6 +705,27 @@ defmodule Explorer.DataFrame.LazyTest do
   end
 
   describe "sort_with/2" do
+    @tag :tmp_dir
+    test "does not execute a joined CSV scan", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "lazy-sort.csv")
+      File.write!(path, "id,value\n1,a\n")
+
+      scanned = DF.from_csv!(path, lazy: true)
+      joined = DF.join(scanned, DF.new([id: [1]], lazy: true))
+      File.rm!(path)
+
+      expression = Explorer.PolarsBackend.Native.expr_column("id")
+
+      assert {:ok, %Explorer.PolarsBackend.LazyFrame{}} =
+               Explorer.PolarsBackend.Native.lf_sort_with(
+                 joined.data,
+                 [expression],
+                 [false],
+                 true,
+                 false
+               )
+    end
+
     test "with a simple df and asc order" do
       ldf = DF.new([a: [1, 2, 4, 3, 6, 5], b: ["a", "b", "d", "c", "f", "e"]], lazy: true)
       ldf1 = DF.sort_with(ldf, fn ldf -> [asc: ldf["a"]] end)
@@ -975,6 +996,52 @@ defmodule Explorer.DataFrame.LazyTest do
 
       assert ldf1.names == df.names
       assert ldf1.dtypes == df.dtypes
+    end
+
+    test "raises when lazily casting an invalid enum value" do
+      ldf = DF.new([status: ["open", "pending"]], lazy: true)
+
+      assert_raise RuntimeError, ~r/enum/i, fn ->
+        DF.mutate_with(ldf, fn ldf ->
+          [status: Series.cast(ldf["status"], {:enum, ["open", "closed"]})]
+        end)
+        |> DF.collect()
+      end
+    end
+
+    test "raises when lazily casting an invalid nested enum value" do
+      ldf = DF.new([statuses: [["open"], ["pending"]]], lazy: true)
+
+      assert_raise RuntimeError, ~r/enum/i, fn ->
+        DF.mutate_with(ldf, fn ldf ->
+          [statuses: Series.cast(ldf["statuses"], {:list, {:enum, ["open", "closed"]}})]
+        end)
+        |> DF.collect()
+      end
+    end
+
+    test "preserves the dtype of a singleton series expression" do
+      dtype = {:enum, ["open", "closed"]}
+      status = Series.from_list(["open"], dtype: dtype)
+      ldf = DF.new([id: [1, 2]], lazy: true)
+      ldf = DF.mutate_with(ldf, fn _ldf -> [status: status] end)
+
+      assert DF.dtypes(ldf) == %{"id" => {:s, 64}, "status" => dtype}
+
+      df = DF.collect(ldf)
+      assert df.dtypes == ldf.dtypes
+      assert DF.to_columns(df) == %{"id" => [1, 2], "status" => ["open", "open"]}
+    end
+
+    test "preserves arbitrary bytes in a singleton binary series expression" do
+      payload = Series.from_list([<<255>>], dtype: :binary)
+      ldf = DF.new([id: [1, 2]], lazy: true)
+      ldf = DF.mutate_with(ldf, fn _ldf -> [payload: payload] end)
+
+      assert DF.collect(ldf) |> DF.to_columns() == %{
+               "id" => [1, 2],
+               "payload" => [<<255>>, <<255>>]
+             }
     end
 
     test "calculates aggregations over groups" do

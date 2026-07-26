@@ -1,7 +1,7 @@
 use crate::{
     datatypes::{
-        ex_naive_datetime_to_timestamp, ExCorrelationMethod, ExDate, ExDecimal, ExNaiveDateTime,
-        ExRankMethod, ExSeriesDtype, ExTime, ExTimeUnit, ExValidValue,
+        contains_enum, ex_naive_datetime_to_timestamp, ExCorrelationMethod, ExDate, ExDecimal,
+        ExNaiveDateTime, ExRankMethod, ExSeriesDtype, ExTime, ExTimeUnit, ExValidValue,
     },
     encoding, ExDataFrame, ExSeries, ExplorerError,
 };
@@ -15,6 +15,21 @@ use rustler::{Binary, Encoder, Env, Term};
 
 pub mod from_list;
 pub mod log;
+
+pub(crate) fn cast_enum_strictly(
+    series: &Series,
+    dtype: &DataType,
+) -> Result<Series, ExplorerError> {
+    if contains_enum(dtype) {
+        series.strict_cast(dtype).map_err(|error| {
+            ExplorerError::Other(format!(
+                "invalid enum value: all non-nil values must be present in enum categories ({error})"
+            ))
+        })
+    } else {
+        series.cast(dtype).map_err(Into::into)
+    }
+}
 
 #[rustler::nif]
 pub fn s_as_str(data: ExSeries) -> Result<String, ExplorerError> {
@@ -36,6 +51,11 @@ pub fn s_rename(data: ExSeries, name: &str) -> Result<ExSeries, ExplorerError> {
 #[rustler::nif]
 pub fn s_dtype(data: ExSeries) -> Result<ExSeriesDtype, ExplorerError> {
     ExSeriesDtype::try_from(data.dtype())
+}
+
+#[rustler::nif]
+pub fn s_same_dtype(left: ExSeries, right: ExSeries) -> Result<bool, ExplorerError> {
+    Ok(left.dtype() == right.dtype())
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
@@ -225,20 +245,22 @@ pub fn s_cut(
     if include_breaks {
         let mut cut_df = cut_series.struct_()?.clone().unnest();
 
-        let cut_df = cut_df.insert_column(0, series)?;
+        cut_df.insert_column(0, series.into())?;
 
-        cut_df.set_column_names([
+        cut_df.set_column_names(&[
             "values",
             break_point_label.unwrap_or("break_point"),
             category_label.unwrap_or("category"),
         ])?;
 
-        Ok(ExDataFrame::new(cut_df.clone()))
+        Ok(ExDataFrame::new(cut_df))
     } else {
-        let mut cut_df = DataFrame::new(vec![Column::from(series), Column::from(cut_series)])?;
-        cut_df.set_column_names(["values", category_label.unwrap_or("category")])?;
+        let height = series.len();
+        let mut cut_df =
+            DataFrame::new(height, vec![Column::from(series), Column::from(cut_series)])?;
+        cut_df.set_column_names(&["values", category_label.unwrap_or("category")])?;
 
-        Ok(ExDataFrame::new(cut_df.clone()))
+        Ok(ExDataFrame::new(cut_df))
     }
 }
 
@@ -267,20 +289,24 @@ pub fn s_qcut(
 
     if include_breaks {
         let mut qcut_df = qcut_series.struct_()?.clone().unnest();
-        let qcut_df = qcut_df.insert_column(0, series)?;
+        qcut_df.insert_column(0, series.into())?;
 
-        qcut_df.set_column_names([
+        qcut_df.set_column_names(&[
             "values",
             break_point_label.unwrap_or("break_point"),
             category_label.unwrap_or("category"),
         ])?;
 
-        Ok(ExDataFrame::new(qcut_df.clone()))
+        Ok(ExDataFrame::new(qcut_df))
     } else {
-        let mut qcut_df = DataFrame::new(vec![Column::from(series), Column::from(qcut_series)])?;
-        qcut_df.set_column_names(["values", category_label.unwrap_or("category")])?;
+        let height = series.len();
+        let mut qcut_df = DataFrame::new(
+            height,
+            vec![Column::from(series), Column::from(qcut_series)],
+        )?;
+        qcut_df.set_column_names(&["values", category_label.unwrap_or("category")])?;
 
-        Ok(ExDataFrame::new(qcut_df.clone()))
+        Ok(ExDataFrame::new(qcut_df))
     }
 }
 
@@ -399,7 +425,9 @@ pub fn s_less_equal(data: ExSeries, rhs: ExSeries) -> Result<ExSeries, ExplorerE
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_in(s: ExSeries, rhs: ExSeries) -> Result<ExSeries, ExplorerError> {
     let s = match s.dtype() {
-        DataType::Categorical(_, _) => is_in(&s, &rhs.implode()?.into(), false)?,
+        DataType::Categorical(_, _) | DataType::Enum(_, _) => {
+            is_in(&s, &rhs.implode()?.into(), false)?
+        }
         _ => is_in(&s, &rhs.cast(s.dtype())?.implode()?.into(), false)?,
     };
 
@@ -554,31 +582,60 @@ fn f64_to_f32(float64: f64) -> f32 {
     float32
 }
 
+// Filling a string series requires a detour through binary, because Polars cannot
+// fill UTF8 series directly.
+fn fill_string_missing_with_bin(series: &Series, binary: &Binary) -> Result<Series, ExplorerError> {
+    if std::str::from_utf8(binary).is_err() {
+        return Err(ExplorerError::Other("cannot cast to string".into()));
+    }
+
+    let filled = unsafe {
+        series
+            .cast_unchecked(&DataType::Binary)?
+            .binary()?
+            .fill_null_with_values(binary)?
+            .cast_unchecked(&DataType::String)?
+    };
+
+    Ok(filled)
+}
+
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_fill_missing_with_bin(
     series: ExSeries,
     binary: Binary,
 ) -> Result<ExSeries, ExplorerError> {
     let s = match series.dtype() {
-        DataType::String => {
-            if let Ok(_string) = std::str::from_utf8(&binary) {
-                // This casting is necessary just because it's not possible to fill UTF8 series.
-                unsafe {
-                    series
-                        .cast_unchecked(&DataType::Binary)?
-                        .binary()?
-                        .fill_null_with_values(&binary)?
-                        .cast_unchecked(&DataType::String)?
-                }
-            } else {
-                return Err(ExplorerError::Other("cannot cast to string".into()));
-            }
-        }
+        DataType::String => fill_string_missing_with_bin(&series, &binary)?,
         DataType::Binary => series
             .binary()?
             .fill_null_with_values(&binary)?
             .into_series(),
-        dt => panic!("fill_missing/2 not implemented for {dt:?}"),
+        // Encode the value once and fill over the physical representation, so that a
+        // wide series is never materialized as strings. The cast is strict because the
+        // caller has already checked the value against the domain.
+        dtype @ (DataType::Enum(_, _) | DataType::Categorical(_, _)) => {
+            let Ok(value) = std::str::from_utf8(&binary) else {
+                return Err(ExplorerError::Other("cannot cast to string".into()));
+            };
+            let name = series.name().clone();
+            let fill = lit(value).strict_cast(dtype.clone());
+
+            series
+                .clone_inner()
+                .into_frame()
+                .lazy()
+                .select([col(name.clone()).fill_null(fill)])
+                .collect()?
+                .column(&name)?
+                .as_materialized_series()
+                .clone()
+        }
+        dtype => {
+            return Err(ExplorerError::Other(format!(
+                "fill_missing/2 is not implemented for dtype {dtype}"
+            )))
+        }
     };
     Ok(ExSeries::new(s))
 }
@@ -928,7 +985,7 @@ pub fn s_median(env: Env, s: ExSeries) -> Result<Term, ExplorerError> {
 
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_mode(s: ExSeries) -> Result<ExSeries, ExplorerError> {
-    match mode::mode(&s) {
+    match mode::mode(&s, false) {
         Ok(s) => Ok(ExSeries::new(s)),
         Err(e) => Err(e.into()),
     }
@@ -1030,6 +1087,9 @@ pub fn s_correlation(
 pub fn s_covariance(env: Env, s1: ExSeries, s2: ExSeries, ddof: u8) -> Result<Term, ExplorerError> {
     let s1 = s1.clone_inner().cast(&DataType::Float64)?;
     let s2 = s2.clone_inner().cast(&DataType::Float64)?;
+    if s1.len() == s2.len() && s1.len() <= ddof as usize {
+        return Ok(None::<f64>.encode(env));
+    }
     let cov = cov(s1.f64()?, s2.f64()?, ddof);
     Ok(term_from_optional_float(cov, env))
 }
@@ -1210,7 +1270,7 @@ pub fn s_n_distinct(s: ExSeries) -> Result<usize, ExplorerError> {
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_cast(s: ExSeries, to_type: ExSeriesDtype) -> Result<ExSeries, ExplorerError> {
     let dtype = DataType::try_from(&to_type)?;
-    Ok(ExSeries::new(s.cast(&dtype)?))
+    Ok(ExSeries::new(cast_enum_strictly(&s, &dtype)?))
 }
 
 pub fn cast_str_to_f32(atom: &str) -> f32 {
@@ -1242,7 +1302,11 @@ pub fn s_categories(s: ExSeries) -> Result<ExSeries, ExplorerError> {
                 .collect();
             Ok(ExSeries::new(categories))
         }
-        _ => panic!("Cannot get categories from non categorical series"),
+        DataType::Enum(categories, _) => {
+            let categories: Vec<&str> = categories.categories().values_iter().collect();
+            Ok(ExSeries::new(Series::new("".into(), categories)))
+        }
+        _ => panic!("Cannot get categories from non categorical or enum series"),
     }
 }
 
@@ -1283,6 +1347,7 @@ pub fn s_sample_n(
     shuffle: bool,
     seed: Option<u64>,
 ) -> Result<ExSeries, ExplorerError> {
+    let shuffle = shuffle || (!replace && n < series.len());
     let new_s = series.sample_n(n, replace, shuffle, seed)?;
 
     Ok(ExSeries::new(new_s))
@@ -1296,6 +1361,8 @@ pub fn s_sample_frac(
     shuffle: bool,
     seed: Option<u64>,
 ) -> Result<ExSeries, ExplorerError> {
+    let n = (series.len() as f64 * frac) as usize;
+    let shuffle = shuffle || (!replace && n < series.len());
     let new_s = series.sample_frac(frac, replace, shuffle, seed)?;
 
     Ok(ExSeries::new(new_s))
@@ -1380,7 +1447,17 @@ pub fn s_select(
             true => Ok(on_true),
             false => Ok(on_false),
         },
-        _ => {
+        len => {
+            let on_true = if on_true.len() == 1 {
+                on_true.new_from_index(0, len)
+            } else {
+                on_true.clone_inner()
+            };
+            let on_false = if on_false.len() == 1 {
+                on_false.new_from_index(0, len)
+            } else {
+                on_false.clone_inner()
+            };
             let selected = on_true.zip_with(pred.bool().unwrap(), &on_false)?;
             Ok(ExSeries::new(selected))
         }
@@ -1389,11 +1466,7 @@ pub fn s_select(
 
 #[rustler::nif(schedule = "DirtyCpu")]
 pub fn s_not(s1: ExSeries) -> Result<ExSeries, ExplorerError> {
-    let s2 = s1
-        .bool()?
-        .into_iter()
-        .map(|opt_v| opt_v.map(|v| !v))
-        .collect();
+    let s2 = s1.bool()?.iter().map(|opt_v| opt_v.map(|v| !v)).collect();
 
     Ok(ExSeries::new(s2))
 }
@@ -1895,13 +1968,13 @@ fn s_member(
     inner_dtype: ExSeriesDtype,
 ) -> Result<ExSeries, ExplorerError> {
     let inner_dtype = DataType::try_from(&inner_dtype)?;
-    let value_expr = value.lit_with_matching_precision(&inner_dtype);
+    let contains = value.list_contains(col(s.name().clone()), &inner_dtype);
 
     let s2 = s
         .clone_inner()
         .into_frame()
         .lazy()
-        .select([col(s.name().clone()).list().contains(value_expr, false)])
+        .select([contains.alias(s.name().clone())])
         .collect()?
         .column(s.name())?
         .as_materialized_series()
